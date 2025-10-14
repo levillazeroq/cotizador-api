@@ -1,7 +1,15 @@
 import { Injectable } from '@nestjs/common'
-import { eq, desc } from 'drizzle-orm'
+import { eq, desc, and } from 'drizzle-orm'
 import { DatabaseService } from '../database/database.service'
-import { carts, type Cart, type NewCart, type CartItem } from '../database/schemas'
+import { 
+  carts, 
+  cartItems, 
+  type Cart, 
+  type NewCart, 
+  type CartItem, 
+  type CartItemRecord, 
+  type NewCartItem 
+} from '../database/schemas'
 
 @Injectable()
 export class CartRepository {
@@ -14,6 +22,30 @@ export class CartRepository {
       .orderBy(desc(carts.updatedAt))
   }
 
+  async findAllWithItems(): Promise<(Cart & { items: CartItemRecord[] })[]> {
+    const result = await this.databaseService.db
+      .select()
+      .from(carts)
+      .leftJoin(cartItems, eq(cartItems.cartId, carts.id))
+      .orderBy(desc(carts.updatedAt))
+
+    // Group items by cart
+    const cartMap = new Map<string, Cart & { items: CartItemRecord[] }>()
+    
+    for (const row of result) {
+      const cart = row.carts
+      if (!cartMap.has(cart.id)) {
+        cartMap.set(cart.id, { ...cart, items: [] })
+      }
+      
+      if (row.cart_items) {
+        cartMap.get(cart.id)!.items.push(row.cart_items)
+      }
+    }
+
+    return Array.from(cartMap.values())
+  }
+
   async findById(id: string): Promise<Cart | null> {
     const result = await this.databaseService.db
       .select()
@@ -24,6 +56,25 @@ export class CartRepository {
     return result[0] || null
   }
 
+  async findByIdWithItems(id: string): Promise<(Cart & { items: CartItemRecord[] }) | null> {
+    const result = await this.databaseService.db
+      .select()
+      .from(carts)
+      .leftJoin(cartItems, eq(cartItems.cartId, carts.id))
+      .where(eq(carts.id, id))
+
+    if (result.length === 0) {
+      return null
+    }
+
+    const cart = result[0].carts
+    const items = result
+      .filter(row => row.cart_items)
+      .map(row => row.cart_items!)
+
+    return { ...cart, items }
+  }
+
   async findFirst(): Promise<Cart | null> {
     const result = await this.databaseService.db
       .select()
@@ -31,6 +82,25 @@ export class CartRepository {
       .limit(1)
     
     return result[0] || null
+  }
+
+  async findFirstWithItems(): Promise<(Cart & { items: CartItemRecord[] }) | null> {
+    const result = await this.databaseService.db
+      .select()
+      .from(carts)
+      .leftJoin(cartItems, eq(cartItems.cartId, carts.id))
+      .limit(1)
+
+    if (result.length === 0) {
+      return null
+    }
+
+    const cart = result[0].carts
+    const items = result
+      .filter(row => row.cart_items)
+      .map(row => row.cart_items!)
+
+    return { ...cart, items }
   }
 
   async create(newCart: NewCart): Promise<Cart> {
@@ -75,21 +145,99 @@ export class CartRepository {
   }
 
   async clearFirst(): Promise<Cart | null> {
+    // First, delete all cart items
+    await this.databaseService.db
+      .delete(cartItems)
+      .where(eq(cartItems.cartId, (await this.findFirst())?.id || ''))
+
+    // Then update cart totals
     return await this.updateFirst({
-      items: [],
       totalItems: 0,
       totalPrice: '0',
     })
   }
 
+  // Cart Items methods
+  async createCartItem(newCartItem: NewCartItem): Promise<CartItemRecord> {
+    const result = await this.databaseService.db
+      .insert(cartItems)
+      .values(newCartItem)
+      .returning()
+    
+    return result[0]
+  }
+
+  async findCartItemById(itemId: string): Promise<CartItemRecord | null> {
+    const result = await this.databaseService.db
+      .select()
+      .from(cartItems)
+      .where(eq(cartItems.id, itemId))
+      .limit(1)
+    
+    return result[0] || null
+  }
+
+  async findCartItemByProductId(cartId: string, productId: string): Promise<CartItemRecord | null> {
+    const result = await this.databaseService.db
+      .select()
+      .from(cartItems)
+      .where(and(
+        eq(cartItems.cartId, cartId),
+        eq(cartItems.productId, productId)
+      ))
+      .limit(1)
+    
+    return result[0] || null
+  }
+
+  async updateCartItem(itemId: string, updateData: Partial<CartItemRecord>): Promise<CartItemRecord | null> {
+    const result = await this.databaseService.db
+      .update(cartItems)
+      .set({
+        ...updateData,
+        updatedAt: new Date(),
+      })
+      .where(eq(cartItems.id, itemId))
+      .returning()
+    
+    return result[0] || null
+  }
+
+  async deleteCartItem(itemId: string): Promise<boolean> {
+    const result = await this.databaseService.db
+      .delete(cartItems)
+      .where(eq(cartItems.id, itemId))
+      .returning()
+    
+    return result.length > 0
+  }
+
+  async deleteCartItemsByCartId(cartId: string): Promise<boolean> {
+    const result = await this.databaseService.db
+      .delete(cartItems)
+      .where(eq(cartItems.cartId, cartId))
+      .returning()
+    
+    return result.length > 0
+  }
+
   // Helper methods for cart calculations
-  calculateTotals(items: CartItem[]): { totalItems: number; totalPrice: string } {
+  calculateTotals(items: CartItem[] | CartItemRecord[]): { totalItems: number; totalPrice: string } {
     const totalItems = items.reduce((sum, item) => sum + item.quantity, 0)
-    const totalPrice = items.reduce((sum, item) => sum + (item.price * item.quantity), 0)
+    const totalPrice = items.reduce((sum, item) => sum + (parseFloat(item.price.toString()) * item.quantity), 0)
     
     return {
       totalItems,
       totalPrice: totalPrice.toString(),
     }
+  }
+
+  async calculateCartTotals(cartId: string): Promise<{ totalItems: number; totalPrice: string }> {
+    const items = await this.databaseService.db
+      .select()
+      .from(cartItems)
+      .where(eq(cartItems.cartId, cartId))
+
+    return this.calculateTotals(items)
   }
 }

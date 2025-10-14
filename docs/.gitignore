@@ -1,0 +1,5 @@
+# Archivos generados automáticamente
+openapi.json
+
+# Mantener solo el README
+!README.md
