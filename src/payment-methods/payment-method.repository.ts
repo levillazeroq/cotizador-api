@@ -1,19 +1,20 @@
 import { Injectable } from '@nestjs/common'
 import { eq, asc } from 'drizzle-orm'
-import { db } from '../database'
+import { DatabaseService } from '../database/database.service'
 import { paymentMethods, type PaymentMethod, type NewPaymentMethod } from '../database/schemas'
 
 @Injectable()
 export class PaymentMethodRepository {
+  constructor(private readonly databaseService: DatabaseService) {}
   async findAll(): Promise<PaymentMethod[]> {
-    return await db
+    return await this.databaseService.db
       .select()
       .from(paymentMethods)
       .orderBy(asc(paymentMethods.sortOrder), asc(paymentMethods.createdAt))
   }
 
   async findById(id: string): Promise<PaymentMethod | null> {
-    const result = await db
+    const result = await this.databaseService.db
       .select()
       .from(paymentMethods)
       .where(eq(paymentMethods.id, id))
@@ -23,7 +24,7 @@ export class PaymentMethodRepository {
   }
 
   async findByName(name: string): Promise<PaymentMethod | null> {
-    const result = await db
+    const result = await this.databaseService.db
       .select()
       .from(paymentMethods)
       .where(eq(paymentMethods.name, name))
@@ -33,7 +34,7 @@ export class PaymentMethodRepository {
   }
 
   async create(paymentMethodData: NewPaymentMethod): Promise<PaymentMethod> {
-    const result = await db
+    const result = await this.databaseService.db
       .insert(paymentMethods)
       .values(paymentMethodData)
       .returning()
@@ -42,7 +43,7 @@ export class PaymentMethodRepository {
   }
 
   async update(id: string, paymentMethodData: Partial<NewPaymentMethod>): Promise<PaymentMethod | null> {
-    const result = await db
+    const result = await this.databaseService.db
       .update(paymentMethods)
       .set({ ...paymentMethodData, updatedAt: new Date() })
       .where(eq(paymentMethods.id, id))
@@ -52,7 +53,7 @@ export class PaymentMethodRepository {
   }
 
   async delete(id: string): Promise<boolean> {
-    const result = await db
+    const result = await this.databaseService.db
       .delete(paymentMethods)
       .where(eq(paymentMethods.id, id))
     
@@ -68,7 +69,7 @@ export class PaymentMethodRepository {
 
   async reorderFields(fieldOrders: { id: string; sortOrder: number }[]): Promise<void> {
     for (const { id, sortOrder } of fieldOrders) {
-      await db
+      await this.databaseService.db
         .update(paymentMethods)
         .set({ sortOrder, updatedAt: new Date() })
         .where(eq(paymentMethods.id, id))

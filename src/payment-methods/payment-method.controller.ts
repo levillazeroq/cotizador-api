@@ -21,30 +21,30 @@ export class PaymentMethodController {
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
-  async create(@Body() createPaymentMethodDto: CreatePaymentMethodDto): Promise<{ paymentMethod: PaymentMethod }> {
+  async create(@Body() createPaymentMethodDto: CreatePaymentMethodDto): Promise<PaymentMethod> {
     const paymentMethod = await this.paymentMethodService.create(createPaymentMethodDto)
-    return { paymentMethod }
+    return paymentMethod
   }
 
   @Get()
-  async findAll(): Promise<{ paymentMethods: PaymentMethod[] }> {
+  async findAll(): Promise<PaymentMethod[]> {
     const paymentMethods = await this.paymentMethodService.findAll()
-    return { paymentMethods }
+    return paymentMethods
   }
 
   @Get(':id')
-  async findOne(@Param('id') id: string): Promise<{ paymentMethod: PaymentMethod }> {
+  async findOne(@Param('id') id: string): Promise<PaymentMethod> {
     const paymentMethod = await this.paymentMethodService.findOne(id)
-    return { paymentMethod }
+    return paymentMethod
   }
 
   @Patch(':id')
   async update(
     @Param('id') id: string,
     @Body() updatePaymentMethodDto: UpdatePaymentMethodDto,
-  ): Promise<{ paymentMethod: PaymentMethod }> {
+  ): Promise<PaymentMethod> {
     const paymentMethod = await this.paymentMethodService.update(id, updatePaymentMethodDto)
-    return { paymentMethod }
+    return paymentMethod
   }
 
   @Delete(':id')
@@ -54,9 +54,9 @@ export class PaymentMethodController {
   }
 
   @Patch(':id/toggle-active')
-  async toggleActive(@Param('id') id: string): Promise<{ paymentMethod: PaymentMethod }> {
+  async toggleActive(@Param('id') id: string): Promise<PaymentMethod> {
     const paymentMethod = await this.paymentMethodService.toggleActive(id)
-    return { paymentMethod }
+    return paymentMethod
   }
 
   @Post('reorder')

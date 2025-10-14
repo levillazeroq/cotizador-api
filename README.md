@@ -47,25 +47,17 @@ pnpm run start:dev
 - `PATCH /payment-methods/:id/toggle-active` - Toggle payment method active status
 - `POST /payment-methods/reorder` - Reorder payment methods
 
-### Payment Method Types
+### Customization Groups
 
-- `webpay` - WebPay payment method
-- `transfer` - Bank transfer payment method
-- `check` - Check payment method
+- `GET /customization-groups` - Get all customization groups
+- `GET /customization-groups/active` - Get active customization groups
+- `GET /customization-groups/:id` - Get customization group by ID
+- `POST /customization-groups` - Create new customization group
+- `PATCH /customization-groups/:id` - Update customization group
+- `DELETE /customization-groups/:id` - Delete customization group
+- `PATCH /customization-groups/:id/toggle-active` - Toggle customization group active status
+- `POST /customization-groups/reorder` - Reorder customization groups
 
-## Database Schema
-
-The payment methods table includes:
-- `id` - UUID primary key
-- `name` - Unique name identifier
-- `type` - Payment method type (webpay, transfer, check)
-- `displayName` - Display name for UI
-- `icon` - Icon identifier
-- `isActive` - Active status
-- `requiresProof` - Whether proof is required
-- `sortOrder` - Sort order for display
-- `createdAt` - Creation timestamp
-- `updatedAt` - Last update timestamp
 
 ## Development
 
