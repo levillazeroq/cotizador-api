@@ -7,6 +7,7 @@ import { PaymentMethodModule } from './payment-methods/payment-method.module';
 import { CustomizationGroupModule } from './customization-groups/customization-group.module';
 import { CustomizationFieldModule } from './customization-fields/customization-field.module';
 import { ProductsModule } from './products/products.module';
+import { CartModule } from './carts/cart.module';
 
 @Module({
   imports: [
@@ -18,7 +19,8 @@ import { ProductsModule } from './products/products.module';
     PaymentMethodModule, 
     CustomizationGroupModule,
     CustomizationFieldModule,
-    ProductsModule
+    ProductsModule,
+    CartModule
   ],
   controllers: [AppController],
   providers: [AppService],
