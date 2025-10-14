@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import axios, { AxiosInstance } from 'axios';
 
 @Injectable()
-export class ProductsService {
+export class InventoryService {
   private readonly apiClient: AxiosInstance;
 
   constructor(private configService: ConfigService) {
@@ -20,11 +20,11 @@ export class ProductsService {
     // Request interceptor
     this.apiClient.interceptors.request.use(
       (config) => {
-        console.log(`🚀 [Products API] ${config.method?.toUpperCase()} ${config.url}`);
+        console.log(`🚀 [Inventory API] ${config.method?.toUpperCase()} ${config.url}`);
         return config;
       },
       (error) => {
-        console.error('❌ [Products API] Request Error:', error);
+        console.error('❌ [Inventory API] Request Error:', error);
         return Promise.reject(error);
       }
     );
@@ -32,11 +32,11 @@ export class ProductsService {
     // Response interceptor
     this.apiClient.interceptors.response.use(
       (response) => {
-        console.log(`✅ [Products API] ${response.status} ${response.config.url}`);
+        console.log(`✅ [Inventory API] ${response.status} ${response.config.url}`);
         return response;
       },
       (error) => {
-        console.error('❌ [Products API] Response Error:', error.response?.status, error.response?.data);
+        console.error('❌ [Inventory API] Response Error:', error.response?.status, error.response?.data);
         
         if (error.response) {
           const { status, data } = error.response;
@@ -90,19 +90,15 @@ export class ProductsService {
     return response.data;
   }
 
-  // DELETE request
-  async delete<T = any>(url: string): Promise<T> {
-    const response = await this.apiClient.delete(url);
+  // PATCH request
+  async patch<T = any>(url: string, data?: any): Promise<T> {
+    const response = await this.apiClient.patch(url, data);
     return response.data;
   }
 
-  // Upload file
-  async upload<T = any>(url: string, formData: FormData): Promise<T> {
-    const response = await this.apiClient.post(url, formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    });
+  // DELETE request
+  async delete<T = any>(url: string): Promise<T> {
+    const response = await this.apiClient.delete(url);
     return response.data;
   }
 }

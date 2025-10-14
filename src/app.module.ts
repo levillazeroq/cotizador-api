@@ -8,6 +8,7 @@ import { CustomizationGroupModule } from './customization-groups/customization-g
 import { CustomizationFieldModule } from './customization-fields/customization-field.module';
 import { ProductsModule } from './products/products.module';
 import { CartModule } from './carts/cart.module';
+import { InventoryModule } from './inventory/inventory.module';
 
 @Module({
   imports: [
@@ -20,7 +21,8 @@ import { CartModule } from './carts/cart.module';
     CustomizationGroupModule,
     CustomizationFieldModule,
     ProductsModule,
-    CartModule
+    CartModule,
+    InventoryModule
   ],
   controllers: [AppController],
   providers: [AppService],

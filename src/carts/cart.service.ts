@@ -184,14 +184,23 @@ export class CartService {
     
     if (!cart) {
       // Create cart if none exists
+      const items = (updateCartDto.items || []).map(item => ({
+        ...item,
+        id: `${item.productId}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+      }))
       cart = await this.cartRepository.create({
-        items: updateCartDto.items || [],
+        items,
         totalItems: 0,
         totalPrice: '0',
       })
     } else {
       // Update existing cart
-      const items = updateCartDto.items || cart.items
+      const items = updateCartDto.items 
+        ? updateCartDto.items.map(item => ({
+            ...item,
+            id: `${item.productId}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+          }))
+        : cart.items
       const { totalItems, totalPrice } = this.cartRepository.calculateTotals(items)
 
       const updatedCart = await this.cartRepository.updateFirst({
@@ -238,7 +247,12 @@ export class CartService {
       throw new NotFoundException(`Cart with ID ${id} not found`)
     }
 
-    const items = updateCartDto.items || existingCart.items
+    const items = updateCartDto.items 
+      ? updateCartDto.items.map(item => ({
+          ...item,
+          id: `${item.productId}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+        }))
+      : existingCart.items
     const { totalItems, totalPrice } = this.cartRepository.calculateTotals(items)
 
     const updatedCart = await this.cartRepository.update(id, {
