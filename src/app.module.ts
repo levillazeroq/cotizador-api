@@ -6,6 +6,7 @@ import { DatabaseModule } from './database/database.module';
 import { PaymentMethodModule } from './payment-methods/payment-method.module';
 import { CustomizationGroupModule } from './customization-groups/customization-group.module';
 import { CustomizationFieldModule } from './customization-fields/customization-field.module';
+import { ProductsModule } from './products/products.module';
 
 @Module({
   imports: [
@@ -16,7 +17,8 @@ import { CustomizationFieldModule } from './customization-fields/customization-f
     DatabaseModule,
     PaymentMethodModule, 
     CustomizationGroupModule,
-    CustomizationFieldModule
+    CustomizationFieldModule,
+    ProductsModule
   ],
   controllers: [AppController],
   providers: [AppService],
