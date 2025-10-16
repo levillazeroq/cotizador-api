@@ -1,37 +1,68 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common'
 import { CartRepository } from './cart.repository'
+import { CreateCartDto } from './dto/create-cart.dto'
 import { CreateCartItemDto } from './dto/create-cart-item.dto'
 import { UpdateCartDto } from './dto/update-cart.dto'
 import { UpdateCartItemQuantityDto } from './dto/update-cart-item-quantity.dto'
+import { UpdateCustomizationDto } from './dto/update-customization.dto'
 import { Cart, CartItem, CartItemRecord, NewCartItem } from '../database/schemas'
+import { CartGateway } from './cart.gateway'
 
 @Injectable()
 export class CartService {
-  constructor(private readonly cartRepository: CartRepository) {}
+  constructor(
+    private readonly cartRepository: CartRepository,
+    private readonly cartGateway: CartGateway,
+  ) {}
 
-  async getCart(): Promise<Cart & { items: CartItemRecord[] }> {
-    let cart = await this.cartRepository.findFirstWithItems()
-    
-    if (!cart) {
-      // Create empty cart if none exists
-      const newCart = await this.cartRepository.create({
-        totalItems: 0,
-        totalPrice: '0',
-      })
-      cart = { ...newCart, items: [] }
-    }
+  async createCart(createCartDto: CreateCartDto): Promise<Cart & { items: CartItemRecord[] }> {
+    const { conversationId, items } = createCartDto
 
-    return cart
-  }
-
-  async createCart(): Promise<Cart & { items: CartItemRecord[] }> {
-    // Create new empty cart
+    // Create new cart with conversation_id
     const newCart = await this.cartRepository.create({
+      conversationId,
       totalItems: 0,
       totalPrice: '0',
     })
     
-    return { ...newCart, items: [] }
+    // Add items if provided
+    const cartItems: CartItemRecord[] = []
+    if (items && items.length > 0) {
+      for (const item of items) {
+        const newCartItem: NewCartItem = {
+          cartId: newCart.id,
+          productId: item.productId,
+          name: item.name,
+          sku: item.sku,
+          size: item.size,
+          color: item.color,
+          price: item.price.toString(),
+          quantity: Math.min(item.quantity, item.maxStock),
+          imageUrl: item.imageUrl,
+          maxStock: item.maxStock,
+        }
+        const createdItem = await this.cartRepository.createCartItem(newCartItem)
+        cartItems.push(createdItem)
+      }
+
+      // Recalculate totals if items were added
+      const { totalItems, totalPrice } = await this.cartRepository.calculateCartTotals(newCart.id)
+      await this.cartRepository.update(newCart.id, {
+        totalItems,
+        totalPrice,
+      })
+    }
+
+    // Return cart with items
+    const cartWithItems = await this.cartRepository.findByIdWithItems(newCart.id)
+    if (!cartWithItems) {
+      throw new BadRequestException('Failed to retrieve created cart')
+    }
+
+    // Emit real-time event
+    this.cartGateway.emitCartUpdated(newCart.id, cartWithItems)
+    
+    return cartWithItems
   }
 
   async getAllCarts(): Promise<Cart[]> {
@@ -46,198 +77,12 @@ export class CartService {
     return cart
   }
 
-  async addItem(createCartItemDto: CreateCartItemDto): Promise<Cart & { items: CartItemRecord[] }> {
-    let cart = await this.cartRepository.findFirst()
-    
+  async getCartByConversationId(conversationId: string): Promise<Cart & { items: CartItemRecord[] }> {
+    const cart = await this.cartRepository.findByConversationIdWithItems(conversationId)
     if (!cart) {
-      // Create cart if none exists
-      cart = await this.cartRepository.create({
-        totalItems: 0,
-        totalPrice: '0',
-      })
+      throw new NotFoundException(`Cart with conversation ID ${conversationId} not found`)
     }
-
-    // Check if item already exists
-    const existingItem = await this.cartRepository.findCartItemByProductId(cart.id, createCartItemDto.productId)
-
-    if (existingItem) {
-      // Update quantity if item already exists
-      const newQuantity = Math.min(existingItem.quantity + createCartItemDto.quantity, createCartItemDto.maxStock)
-      await this.cartRepository.updateCartItem(existingItem.id, { quantity: newQuantity })
-    } else {
-      // Add new item
-      const newCartItem: NewCartItem = {
-        cartId: cart.id,
-        productId: createCartItemDto.productId,
-        name: createCartItemDto.name,
-        sku: createCartItemDto.sku,
-        size: createCartItemDto.size,
-        color: createCartItemDto.color,
-        price: createCartItemDto.price.toString(),
-        quantity: Math.min(createCartItemDto.quantity, createCartItemDto.maxStock),
-        imageUrl: createCartItemDto.imageUrl,
-        maxStock: createCartItemDto.maxStock,
-      }
-      await this.cartRepository.createCartItem(newCartItem)
-    }
-
-    // Recalculate totals
-    const { totalItems, totalPrice } = await this.cartRepository.calculateCartTotals(cart.id)
-
-    // Update cart totals
-    const updatedCart = await this.cartRepository.update(cart.id, {
-      totalItems,
-      totalPrice,
-    })
-
-    if (!updatedCart) {
-      throw new BadRequestException('Failed to update cart')
-    }
-
-    // Return cart with items
-    const cartWithItems = await this.cartRepository.findByIdWithItems(cart.id)
-    if (!cartWithItems) {
-      throw new BadRequestException('Failed to retrieve updated cart')
-    }
-
-    return cartWithItems
-  }
-
-  async updateItemQuantity(productId: string, updateQuantityDto: UpdateCartItemQuantityDto): Promise<Cart & { items: CartItemRecord[] }> {
-    const cart = await this.cartRepository.findFirst()
-    
-    if (!cart) {
-      throw new NotFoundException('Cart not found')
-    }
-
-    const existingItem = await this.cartRepository.findCartItemByProductId(cart.id, productId)
-    
-    if (!existingItem) {
-      throw new NotFoundException('Item not found in cart')
-    }
-
-    if (updateQuantityDto.quantity === 0) {
-      // Remove item if quantity is 0
-      await this.cartRepository.deleteCartItem(existingItem.id)
-    } else {
-      // Update quantity
-      const newQuantity = Math.min(updateQuantityDto.quantity, existingItem.maxStock)
-      await this.cartRepository.updateCartItem(existingItem.id, { quantity: newQuantity })
-    }
-
-    // Recalculate totals
-    const { totalItems, totalPrice } = await this.cartRepository.calculateCartTotals(cart.id)
-
-    // Update cart totals
-    const updatedCart = await this.cartRepository.update(cart.id, {
-      totalItems,
-      totalPrice,
-    })
-
-    if (!updatedCart) {
-      throw new BadRequestException('Failed to update cart')
-    }
-
-    // Return cart with items
-    const cartWithItems = await this.cartRepository.findByIdWithItems(cart.id)
-    if (!cartWithItems) {
-      throw new BadRequestException('Failed to retrieve updated cart')
-    }
-
-    return cartWithItems
-  }
-
-  async removeItem(productId: string): Promise<Cart & { items: CartItemRecord[] }> {
-    const cart = await this.cartRepository.findFirst()
-    
-    if (!cart) {
-      throw new NotFoundException('Cart not found')
-    }
-
-    const existingItem = await this.cartRepository.findCartItemByProductId(cart.id, productId)
-    
-    if (!existingItem) {
-      throw new NotFoundException('Item not found in cart')
-    }
-
-    // Remove item
-    await this.cartRepository.deleteCartItem(existingItem.id)
-
-    // Recalculate totals
-    const { totalItems, totalPrice } = await this.cartRepository.calculateCartTotals(cart.id)
-
-    // Update cart totals
-    const updatedCart = await this.cartRepository.update(cart.id, {
-      totalItems,
-      totalPrice,
-    })
-
-    if (!updatedCart) {
-      throw new BadRequestException('Failed to update cart')
-    }
-
-    // Return cart with items
-    const cartWithItems = await this.cartRepository.findByIdWithItems(cart.id)
-    if (!cartWithItems) {
-      throw new BadRequestException('Failed to retrieve updated cart')
-    }
-
-    return cartWithItems
-  }
-
-  async updateCart(updateCartDto: UpdateCartDto): Promise<Cart & { items: CartItemRecord[] }> {
-    let cart = await this.cartRepository.findFirst()
-    
-    if (!cart) {
-      // Create cart if none exists
-      cart = await this.cartRepository.create({
-        totalItems: 0,
-        totalPrice: '0',
-      })
-    }
-
-    // Clear existing items
-    await this.cartRepository.deleteCartItemsByCartId(cart.id)
-
-    // Add new items
-    if (updateCartDto.items && updateCartDto.items.length > 0) {
-      for (const item of updateCartDto.items) {
-        const newCartItem: NewCartItem = {
-          cartId: cart.id,
-          productId: item.productId,
-          name: item.name,
-          sku: item.sku,
-          size: item.size,
-          color: item.color,
-          price: item.price.toString(),
-          quantity: Math.min(item.quantity, item.maxStock),
-          imageUrl: item.imageUrl,
-          maxStock: item.maxStock,
-        }
-        await this.cartRepository.createCartItem(newCartItem)
-      }
-    }
-
-    // Recalculate totals
-    const { totalItems, totalPrice } = await this.cartRepository.calculateCartTotals(cart.id)
-
-    // Update cart totals
-    const updatedCart = await this.cartRepository.update(cart.id, {
-      totalItems,
-      totalPrice,
-    })
-
-    if (!updatedCart) {
-      throw new BadRequestException('Failed to update cart')
-    }
-
-    // Return cart with items
-    const cartWithItems = await this.cartRepository.findByIdWithItems(cart.id)
-    if (!cartWithItems) {
-      throw new BadRequestException('Failed to retrieve updated cart')
-    }
-
-    return cartWithItems
+    return cart
   }
 
   async updateCartById(id: string, updateCartDto: UpdateCartDto): Promise<Cart & { items: CartItemRecord[] }> {
@@ -287,6 +132,41 @@ export class CartService {
       throw new BadRequestException('Failed to retrieve updated cart')
     }
 
+    // Emit real-time event
+    this.cartGateway.emitCartUpdated(id, cartWithItems)
+
     return cartWithItems
+  }
+
+  async updateCustomization(
+    cartId: string, 
+    updateCustomizationDto: UpdateCustomizationDto
+  ): Promise<Cart & { items: CartItemRecord[] }> {
+    const existingCart = await this.cartRepository.findByIdWithItems(cartId)
+    if (!existingCart) {
+      throw new NotFoundException(`Cart with ID ${cartId} not found`)
+    }
+
+    const { selectedProductIds, customizationValues } = updateCustomizationDto
+
+    // Update customization values for selected products
+    for (const item of existingCart.items) {
+      if (selectedProductIds.includes(item.id)) {
+        await this.cartRepository.updateCartItem(item.id, {
+          customizationValues,
+        })
+      }
+    }
+
+    // Get updated cart
+    const updatedCart = await this.cartRepository.findByIdWithItems(cartId)
+    if (!updatedCart) {
+      throw new BadRequestException('Failed to retrieve updated cart')
+    }
+
+    // Emit real-time event
+    this.cartGateway.emitCartUpdated(cartId, updatedCart)
+
+    return updatedCart
   }
 }

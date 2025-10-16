@@ -75,6 +75,35 @@ export class CartRepository {
     return { ...cart, items }
   }
 
+  async findByConversationId(conversationId: string): Promise<Cart | null> {
+    const result = await this.databaseService.db
+      .select()
+      .from(carts)
+      .where(eq(carts.conversationId, conversationId))
+      .limit(1)
+    
+    return result[0] || null
+  }
+
+  async findByConversationIdWithItems(conversationId: string): Promise<(Cart & { items: CartItemRecord[] }) | null> {
+    const result = await this.databaseService.db
+      .select()
+      .from(carts)
+      .leftJoin(cartItems, eq(cartItems.cartId, carts.id))
+      .where(eq(carts.conversationId, conversationId))
+
+    if (result.length === 0) {
+      return null
+    }
+
+    const cart = result[0].carts
+    const items = result
+      .filter(row => row.cart_items)
+      .map(row => row.cart_items!)
+
+    return { ...cart, items }
+  }
+
   async findFirst(): Promise<Cart | null> {
     const result = await this.databaseService.db
       .select()

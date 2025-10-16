@@ -1,4 +1,4 @@
-import { pgTable, uuid, integer, decimal, timestamp, text, varchar } from 'drizzle-orm/pg-core'
+import { pgTable, uuid, integer, decimal, timestamp, text, varchar, jsonb } from 'drizzle-orm/pg-core'
 import { relations } from 'drizzle-orm'
 import { createInsertSchema, createSelectSchema } from 'drizzle-zod'
 
@@ -15,6 +15,7 @@ export const cartItems = pgTable('cart_items', {
   quantity: integer('quantity').notNull().default(1),
   imageUrl: text('image_url'),
   maxStock: integer('max_stock').notNull(),
+  customizationValues: jsonb('customization_values'),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 })
@@ -22,6 +23,7 @@ export const cartItems = pgTable('cart_items', {
 // Carts Table (simplified without JSON field)
 export const carts = pgTable('carts', {
   id: uuid('id').primaryKey().defaultRandom(),
+  conversationId: varchar('conversation_id', { length: 255 }).notNull(),
   totalItems: integer('total_items').notNull().default(0),
   totalPrice: decimal('total_price', { precision: 10, scale: 2 })
     .notNull()
@@ -55,6 +57,7 @@ export interface CartItem {
   quantity: number
   imageUrl?: string
   maxStock: number
+  customizationValues?: Record<string, any>
   createdAt: Date
   updatedAt: Date
 }

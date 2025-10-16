@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Put,
+  Patch,
   Body,
   Param,
   HttpCode,
@@ -16,7 +17,9 @@ import {
   ApiBody,
 } from '@nestjs/swagger'
 import { CartService } from './cart.service'
+import { CreateCartDto } from './dto/create-cart.dto'
 import { UpdateCartDto } from './dto/update-cart.dto'
+import { UpdateCustomizationDto } from './dto/update-customization.dto'
 
 @ApiTags('carts')
 @Controller('cart')
@@ -53,6 +56,7 @@ export class CartController {
     // Format response for quotes
     const quotes = carts.map(cart => ({
       id: cart.id,
+      conversationId: cart.conversationId,
       totalItems: cart.totalItems,
       totalPrice: parseFloat(cart.totalPrice),
       createdAt: cart.createdAt,
@@ -69,6 +73,58 @@ export class CartController {
     }))
 
     return quotes
+  }
+
+  @ApiOperation({
+    summary: 'Obtener carrito por conversation ID',
+    description: 'Busca y retorna un carrito específico asociado a un conversation_id. Retorna el carrito con todos sus items.',
+  })
+  @ApiParam({
+    name: 'conversationId',
+    description: 'ID de la conversación',
+    type: String,
+    example: 'conv_abc123xyz',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Carrito encontrado exitosamente',
+    schema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string', example: 'cart_123456' },
+        conversationId: { type: 'string', example: 'conv_abc123xyz' },
+        items: { type: 'array', items: {} },
+        totalItems: { type: 'number', example: 3 },
+        totalPrice: { type: 'number', example: 150000 },
+        createdAt: { type: 'string', format: 'date-time' },
+        updatedAt: { type: 'string', format: 'date-time' },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Carrito no encontrado',
+    schema: {
+      type: 'object',
+      properties: {
+        statusCode: { type: 'number', example: 404 },
+        message: { type: 'string', example: 'Cart with conversation ID conv_abc123xyz not found' },
+        error: { type: 'string', example: 'Not Found' },
+      },
+    },
+  })
+  @Get('conversation/:conversationId')
+  async getCartByConversationId(@Param('conversationId') conversationId: string) {
+    const cart = await this.cartService.getCartByConversationId(conversationId)
+    return {
+      id: cart.id,
+      conversationId: cart.conversationId,
+      items: cart.items,
+      totalItems: cart.totalItems,
+      totalPrice: parseFloat(cart.totalPrice),
+      createdAt: cart.createdAt,
+      updatedAt: cart.updatedAt,
+    }
   }
 
   @ApiOperation({
@@ -143,7 +199,7 @@ export class CartController {
 
   @ApiOperation({
     summary: 'Crear nuevo carrito',
-    description: 'Crea un nuevo carrito vacío. Retorna el carrito recién creado con ID único.',
+    description: 'Crea un nuevo carrito asociado a una conversación. Opcionalmente puede incluir items iniciales.',
   })
   @ApiResponse({
     status: 201,
@@ -152,7 +208,8 @@ export class CartController {
       type: 'object',
       properties: {
         id: { type: 'string', example: 'cart_123456' },
-        items: { type: 'array', items: {}, example: [] },
+        conversationId: { type: 'string', example: 'conv_abc123xyz' },
+        items: { type: 'array', items: {} },
         totalItems: { type: 'number', example: 0 },
         totalPrice: { type: 'number', example: 0 },
         createdAt: { type: 'string', format: 'date-time' },
@@ -174,10 +231,11 @@ export class CartController {
   })
   @Post()
   @HttpCode(HttpStatus.CREATED)
-  async createCart() {
-    const cart = await this.cartService.createCart()
+  async createCart(@Body() createCartDto: CreateCartDto) {
+    const cart = await this.cartService.createCart(createCartDto)
     return {
       id: cart.id,
+      conversationId: cart.conversationId,
       items: cart.items,
       totalItems: cart.totalItems,
       totalPrice: parseFloat(cart.totalPrice),
@@ -264,6 +322,69 @@ export class CartController {
     return {
       id: cart.id,
       items: cart.items,
+      totalItems: cart.totalItems,
+      totalPrice: parseFloat(cart.totalPrice),
+    }
+  }
+
+  @ApiOperation({
+    summary: 'Actualizar personalización de productos en el carrito',
+    description: 'Actualiza los valores de personalización para los productos seleccionados en un carrito.',
+  })
+  @ApiParam({
+    name: 'id',
+    description: 'ID único del carrito',
+    example: 'cart_123456',
+    type: String,
+  })
+  @ApiBody({
+    type: UpdateCustomizationDto,
+    description: 'Datos de personalización a actualizar',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Personalización actualizada exitosamente',
+    schema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string', example: 'cart_123456' },
+        items: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              id: { type: 'string', example: 'item_789' },
+              productId: { type: 'string', example: 'prod_123456' },
+              name: { type: 'string', example: 'Laptop Dell XPS 13' },
+              customizationValues: {
+                type: 'object',
+                example: {
+                  'field-1': 'Logo personalizado',
+                  'field-2': 'Azul',
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Carrito no encontrado',
+  })
+  @Patch(':id/customization')
+  async updateCustomization(
+    @Param('id') id: string,
+    @Body() updateCustomizationDto: UpdateCustomizationDto,
+  ) {
+    const cart = await this.cartService.updateCustomization(id, updateCustomizationDto)
+    return {
+      id: cart.id,
+      items: cart.items.map((item) => ({
+        ...item,
+        price: parseFloat(item.price.toString()),
+      })),
       totalItems: cart.totalItems,
       totalPrice: parseFloat(cart.totalPrice),
     }
