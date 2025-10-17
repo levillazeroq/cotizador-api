@@ -7,12 +7,7 @@ async function bootstrap() {
   
   // Enable CORS
   app.enableCors({
-    origin: [
-      'http://localhost:3000', // Next.js development server
-      'http://localhost:3001', // Alternative port
-      'https://ai-agent-dashboard.zeroq.cl', // Production dashboard
-      'https://qa.zeroq.cl', // QA environment
-    ],
+    origin: ['*'],
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: [
       'Origin',
