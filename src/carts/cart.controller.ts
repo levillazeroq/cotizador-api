@@ -187,14 +187,7 @@ export class CartController {
   @Get(':id')
   async getCartById(@Param('id') id: string) {
     const cart = await this.cartService.getCartById(id)
-    return {
-      id: cart.id,
-      items: cart.items,
-      totalItems: cart.totalItems,
-      totalPrice: parseFloat(cart.totalPrice),
-      createdAt: cart.createdAt,
-      updatedAt: cart.updatedAt,
-    }
+    return cart
   }
 
   @ApiOperation({
