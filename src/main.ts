@@ -5,11 +5,21 @@ import { AppModule } from './app.module';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   
-  // Enable CORS
+  // Enable CORS - Allow all origins for now
   app.enableCors({
-    origin: ['*'],
+    origin: true, // Esto permite cualquier origen
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['*']
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'Accept',
+      'Origin',
+      'X-Requested-With',
+      'Cache-Control',
+    ],
+    exposedHeaders: ['Content-Length', 'Content-Type'],
+    credentials: false, // Importante: false cuando se permite cualquier origen
+    maxAge: 3600, // Cache preflight request por 1 hora
   });
 
   // Swagger configuration - Se genera automáticamente en cada inicio

@@ -12,13 +12,8 @@ import { Logger } from '@nestjs/common'
 
 @WebSocketGateway({
   cors: {
-    origin: [
-      'http://localhost:3000',
-      'http://localhost:3001',
-      'https://ai-agent-dashboard.zeroq.cl',
-      'https://qa.zeroq.cl',
-    ],
-    credentials: true,
+    origin: true, // Permite cualquier origen
+    credentials: false,
   },
   namespace: '/carts',
 })
