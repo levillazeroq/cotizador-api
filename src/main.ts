@@ -16,8 +16,7 @@ async function bootstrap() {
       'Accept',
       'Authorization',
       'Cache-Control',
-    ],
-    credentials: true,
+    ]
   });
 
   // Swagger configuration - Se genera automáticamente en cada inicio
