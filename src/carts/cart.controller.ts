@@ -116,15 +116,7 @@ export class CartController {
   @Get('conversation/:conversationId')
   async getCartByConversationId(@Param('conversationId') conversationId: string) {
     const cart = await this.cartService.getCartByConversationId(conversationId)
-    return {
-      id: cart.id,
-      conversationId: cart.conversationId,
-      items: cart.items,
-      totalItems: cart.totalItems,
-      totalPrice: parseFloat(cart.totalPrice),
-      createdAt: cart.createdAt,
-      updatedAt: cart.updatedAt,
-    }
+    return cart
   }
 
   @ApiOperation({
