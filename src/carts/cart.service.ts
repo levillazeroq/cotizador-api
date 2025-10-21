@@ -159,14 +159,8 @@ export class CartService {
             maxStock: product.stock || 999,
           };
           await this.cartRepository.createCartItem(newCartItem);
-        }
-
-        if (item.operation === 'remove') {
-          await this.cartRepository.deleteCartItem(item.productId);
         } else {
-          await this.cartRepository.updateCartItem(item.productId, {
-            quantity: item.quantity,
-          });
+          await this.cartRepository.deleteCartItem(item.productId);
         }
       }
     }
