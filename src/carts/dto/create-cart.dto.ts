@@ -13,9 +13,14 @@ export class CreateCartDto {
   conversationId: string
 
   @ApiPropertyOptional({
-    description: 'Items iniciales para agregar al carrito',
+    description: 'Items iniciales para agregar al carrito. Solo se requiere productId y quantity, el resto de la información se obtendrá automáticamente del producto.',
     type: [CreateCartItemDto],
-    example: [],
+    example: [
+      {
+        productId: 'prod_123456',
+        quantity: 1,
+      },
+    ],
   })
   @IsOptional()
   @IsArray()
