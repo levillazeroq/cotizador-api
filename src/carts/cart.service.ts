@@ -5,15 +5,11 @@ import {
 } from '@nestjs/common';
 import { CartRepository } from './cart.repository';
 import { CreateCartDto } from './dto/create-cart.dto';
-import { CreateCartItemDto } from './dto/create-cart-item.dto';
 import { UpdateCartDto } from './dto/update-cart.dto';
-import { UpdateCartItemQuantityDto } from './dto/update-cart-item-quantity.dto';
 import { UpdateCustomizationDto } from './dto/update-customization.dto';
 import {
-  Cart,
-  CartItem,
-  CartItemRecord,
-  NewCartItem,
+  Cart, CartItemRecord,
+  NewCartItem
 } from '../database/schemas';
 import { CartGateway } from './cart.gateway';
 import { ProductsService } from '../products/products.service';
@@ -133,34 +129,18 @@ export class CartService {
     // Add new items
     if (updateCartDto.items && updateCartDto.items.length > 0) {
       for (const item of updateCartDto.items) {
-        // Fetch product data from external API
-
         if (item.operation === 'add') {
-          const product = await this.productsService.get(
-            `/products/${item.productId}`,
-          );
-
-          if (!product) {
-            throw new NotFoundException(
-              `Product with ID ${item.productId} not found`,
-            );
-          }
-
-          const newCartItem: NewCartItem = {
+          await this.cartRepository.addCartItemByProductId({
             cartId: id,
             productId: item.productId,
-            name: product.name,
-            sku: product.sku,
-            size: product.size || null,
-            color: product.color || null,
-            price: product.price.toString(),
-            quantity: Math.min(item.quantity, product.stock || item.quantity),
-            imageUrl: product.imageUrl || product.images?.[0] || null,
-            maxStock: product.stock || 999,
-          };
-          await this.cartRepository.createCartItem(newCartItem);
+            quantity: item.quantity,
+          });
         } else {
-          await this.cartRepository.deleteCartItem(item.productId);
+          await this.cartRepository.removeCartItemByProductId({
+            cartId: id,
+            productId: item.productId,
+            quantity: item.quantity,
+          });
         }
       }
     }
