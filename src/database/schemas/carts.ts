@@ -14,7 +14,6 @@ export const cartItems = pgTable('cart_items', {
   price: decimal('price', { precision: 10, scale: 2 }).notNull(),
   quantity: integer('quantity').notNull().default(1),
   imageUrl: text('image_url'),
-  maxStock: integer('max_stock').notNull(),
   customizationValues: jsonb('customization_values'),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),

@@ -231,7 +231,6 @@ export class CartRepository {
         name: product.name,
         sku: product.sku,
         price: productPrice,
-        maxStock: productMaxStock,
       };
       return await this.createCartItem(newCartItem);
     }

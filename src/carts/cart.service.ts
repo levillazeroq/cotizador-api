@@ -59,10 +59,9 @@ export class CartService {
           sku: product.sku,
           size: product.size || null,
           color: product.color || null,
-          price: product.price.toString(),
+          price: product.price.amount,
           quantity: Math.min(item.quantity, product.stock || item.quantity),
           imageUrl: product.imageUrl || product.images?.[0] || null,
-          maxStock: product.stock || 999,
         };
         const createdItem =
           await this.cartRepository.createCartItem(newCartItem);
