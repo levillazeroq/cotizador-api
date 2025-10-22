@@ -27,5 +27,32 @@ export class CreateCartDto {
   @ValidateNested({ each: true })
   @Type(() => CreateCartItemDto)
   items?: CreateCartItemDto[]
+
+  @ApiPropertyOptional({
+    description: 'Nombre completo del cliente',
+    example: 'Juan Pérez García',
+    type: String,
+  })
+  @IsOptional()
+  @IsString()
+  fullName?: string
+
+  @ApiPropertyOptional({
+    description: 'Tipo de documento del cliente',
+    example: 'DNI',
+    enum: ['DNI', 'NIT', 'C.C'],
+  })
+  @IsOptional()
+  @IsString()
+  documentType?: string
+
+  @ApiPropertyOptional({
+    description: 'Número de documento del cliente',
+    example: '12345678',
+    type: String,
+  })
+  @IsOptional()
+  @IsString()
+  documentNumber?: string
 }
 

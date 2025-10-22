@@ -11,6 +11,7 @@ import {
   type NewCartItem,
 } from '../database/schemas';
 import { ProductsService } from '../products/products.service';
+import { json } from 'stream/consumers';
 
 @Injectable()
 export class CartRepository {
@@ -221,13 +222,16 @@ export class CartRepository {
         throw new NotFoundException(`Product with ID ${productId} not found`);
       }
 
+      const productPrice = typeof product.price === 'object' ? product.price.amount : product.price;
+      const productMaxStock = typeof product.stock === 'object' ? product.inventory.available : product.stock;
+
       const newCartItem: NewCartItem = {
         cartId,
         productId,
         name: product.name,
         sku: product.sku,
-        price: product.price.toString(),
-        maxStock: product.stock || 999,
+        price: productPrice,
+        maxStock: productMaxStock,
       };
       return await this.createCartItem(newCartItem);
     }

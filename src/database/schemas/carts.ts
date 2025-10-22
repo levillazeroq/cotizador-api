@@ -28,6 +28,9 @@ export const carts = pgTable('carts', {
   totalPrice: decimal('total_price', { precision: 10, scale: 2 })
     .notNull()
     .default('0'),
+  fullName: text('full_name'),
+  documentType: varchar('document_type', { length: 50 }),
+  documentNumber: varchar('document_number', { length: 100 }),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 })

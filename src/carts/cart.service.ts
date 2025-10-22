@@ -25,13 +25,16 @@ export class CartService {
   async createCart(
     createCartDto: CreateCartDto,
   ): Promise<Cart & { items: CartItemRecord[] }> {
-    const { conversationId, items } = createCartDto;
+    const { conversationId, items, fullName, documentType, documentNumber } = createCartDto;
 
-    // Create new cart with conversation_id
+    // Create new cart with conversation_id and customer info
     const newCart = await this.cartRepository.create({
       conversationId,
       totalItems: 0,
       totalPrice: '0',
+      fullName,
+      documentType,
+      documentNumber,
     });
 
     // Add items if provided
@@ -149,10 +152,13 @@ export class CartService {
     const { totalItems, totalPrice } =
       await this.cartRepository.calculateCartTotals(id);
 
-    // Update cart totals
+    // Update cart totals and customer info if provided
     const updatedCart = await this.cartRepository.update(id, {
       totalItems,
       totalPrice,
+      ...(updateCartDto.fullName !== undefined && { fullName: updateCartDto.fullName }),
+      ...(updateCartDto.documentType !== undefined && { documentType: updateCartDto.documentType }),
+      ...(updateCartDto.documentNumber !== undefined && { documentNumber: updateCartDto.documentNumber }),
     });
 
     if (!updatedCart) {
