@@ -223,7 +223,6 @@ export class CartRepository {
       }
 
       const productPrice = product.price.amount;
-      const productMaxStock = product.stock.available;
 
       const newCartItem: NewCartItem = {
         cartId,
