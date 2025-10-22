@@ -222,8 +222,8 @@ export class CartRepository {
         throw new NotFoundException(`Product with ID ${productId} not found`);
       }
 
-      const productPrice = typeof product.price === 'object' ? product.price.amount : product.price;
-      const productMaxStock = typeof product.stock === 'object' ? product.inventory.available : product.stock;
+      const productPrice = product.price.amount;
+      const productMaxStock = product.stock.available;
 
       const newCartItem: NewCartItem = {
         cartId,
