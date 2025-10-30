@@ -13,7 +13,7 @@ export class ProductsService {
       headers: {
         'Content-Type': 'application/json',
         'Authorization': '',
-        'X-Organization-ID': '11111111-1111-1111-1111-111111111112'
+        'X-Organization-ID': '11111111-1111-1111-1111-111111111333'
       },
     });
 
@@ -76,7 +76,8 @@ export class ProductsService {
 
   // POST request
   async post<T = any>(url: string, data?: any): Promise<T> {
-    const response = await this.apiClient.post(url, data);
+    console.log("data", data);
+    const response = await this.apiClient.post(url, {...data, productType: 'simple'});
     return response.data;
   }
 
