@@ -9,6 +9,8 @@ import { CustomizationFieldModule } from './customization-fields/customization-f
 import { ProductsModule } from './products/products.module';
 import { CartModule } from './carts/cart.module';
 import { InventoryModule } from './inventory/inventory.module';
+import { S3Module } from './s3/s3.module';
+import { PaymentModule } from './payments/payment.module';
 
 @Module({
   imports: [
@@ -22,7 +24,9 @@ import { InventoryModule } from './inventory/inventory.module';
     CustomizationFieldModule,
     ProductsModule,
     CartModule,
-    InventoryModule
+    InventoryModule,
+    S3Module,
+    PaymentModule,
   ],
   controllers: [AppController],
   providers: [AppService],
