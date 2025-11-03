@@ -6,6 +6,7 @@ import {
   Patch,
   Body,
   Param,
+  Query,
   HttpCode,
   HttpStatus,
 } from '@nestjs/common'
@@ -14,6 +15,7 @@ import {
   ApiOperation,
   ApiResponse,
   ApiParam,
+  ApiQuery,
   ApiBody,
 } from '@nestjs/swagger'
 import { CartService } from './cart.service'
@@ -425,7 +427,7 @@ export class CartController {
     example: 'cart_123456',
     type: String,
   })
-  @ApiParam({
+  @ApiQuery({
     name: 'limit',
     description: 'Número de cambios a retornar',
     example: 10,
@@ -440,10 +442,10 @@ export class CartController {
     status: 404,
     description: 'Carrito no encontrado',
   })
-  @Get(':id/changelog/latest/:limit?')
+  @Get(':id/changelog/latest')
   async getCartChangelogLatest(
     @Param('id') id: string,
-    @Param('limit') limit?: string,
+    @Query('limit') limit?: string,
   ) {
     const limitNum = limit ? parseInt(limit, 10) : 10
     return await this.cartService.getCartChangelogLatest(id, limitNum)
