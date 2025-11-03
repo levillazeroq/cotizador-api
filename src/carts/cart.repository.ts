@@ -222,7 +222,7 @@ export class CartRepository {
         throw new NotFoundException(`Product with ID ${productId} not found`);
       }
 
-      const productPrice = product.price;
+      const productPrice = product.price.amount;
 
       const newCartItem: NewCartItem = {
         cartId,
@@ -232,6 +232,7 @@ export class CartRepository {
         sku: product.sku,
         price: productPrice,
       };
+
       return await this.createCartItem(newCartItem);
     }
 
