@@ -374,4 +374,111 @@ export class CartController {
       totalPrice: parseFloat(cart.totalPrice),
     }
   }
+
+  @ApiOperation({
+    summary: 'Obtener historial de cambios del carrito',
+    description: 'Retorna el historial completo de todos los cambios realizados en el carrito (items agregados y eliminados).',
+  })
+  @ApiParam({
+    name: 'id',
+    description: 'ID único del carrito',
+    example: 'cart_123456',
+    type: String,
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Historial obtenido exitosamente',
+    schema: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          id: { type: 'string', example: 'changelog_123' },
+          cartId: { type: 'string', example: 'cart_123456' },
+          productId: { type: 'string', example: 'prod_123456' },
+          productName: { type: 'string', example: 'Laptop Dell XPS 13' },
+          sku: { type: 'string', example: 'DELL-XPS13-2024' },
+          operation: { type: 'string', enum: ['add', 'remove'], example: 'add' },
+          quantity: { type: 'number', example: 2 },
+          price: { type: 'string', example: '1299990' },
+          createdAt: { type: 'string', format: 'date-time' },
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Carrito no encontrado',
+  })
+  @Get(':id/changelog')
+  async getCartChangelog(@Param('id') id: string) {
+    return await this.cartService.getCartChangelog(id)
+  }
+
+  @ApiOperation({
+    summary: 'Obtener últimos cambios del carrito',
+    description: 'Retorna los últimos N cambios realizados en el carrito. Por defecto retorna los últimos 10.',
+  })
+  @ApiParam({
+    name: 'id',
+    description: 'ID único del carrito',
+    example: 'cart_123456',
+    type: String,
+  })
+  @ApiParam({
+    name: 'limit',
+    description: 'Número de cambios a retornar',
+    example: 10,
+    required: false,
+    type: Number,
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Últimos cambios obtenidos exitosamente',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Carrito no encontrado',
+  })
+  @Get(':id/changelog/latest/:limit?')
+  async getCartChangelogLatest(
+    @Param('id') id: string,
+    @Param('limit') limit?: string,
+  ) {
+    const limitNum = limit ? parseInt(limit, 10) : 10
+    return await this.cartService.getCartChangelogLatest(id, limitNum)
+  }
+
+  @ApiOperation({
+    summary: 'Obtener cambios del carrito por operación',
+    description: 'Retorna el historial de cambios filtrado por tipo de operación (add o remove).',
+  })
+  @ApiParam({
+    name: 'id',
+    description: 'ID único del carrito',
+    example: 'cart_123456',
+    type: String,
+  })
+  @ApiParam({
+    name: 'operation',
+    description: 'Tipo de operación a filtrar',
+    enum: ['add', 'remove'],
+    example: 'add',
+    type: String,
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Cambios filtrados obtenidos exitosamente',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Carrito no encontrado',
+  })
+  @Get(':id/changelog/operation/:operation')
+  async getCartChangelogByOperation(
+    @Param('id') id: string,
+    @Param('operation') operation: 'add' | 'remove',
+  ) {
+    return await this.cartService.getCartChangelogByOperation(id, operation)
+  }
 }
