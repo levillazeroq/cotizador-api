@@ -14,9 +14,10 @@ export class CreateProofPaymentDto {
   @IsNumber()
   amount: number;
 
-  @ApiProperty({ description: 'Proof URL (screenshot/document)' })
+  @ApiPropertyOptional({ description: 'Proof URL (screenshot/document) - optional if file is uploaded' })
+  @IsOptional()
   @IsString()
-  proofUrl: string;
+  proofUrl?: string;
 
   @ApiPropertyOptional({ description: 'Payment notes' })
   @IsOptional()

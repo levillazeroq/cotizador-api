@@ -9,19 +9,15 @@ import { UpdatePaymentDto } from './dto/update-payment.dto';
 import { UploadProofDto } from './dto/upload-proof.dto';
 import { ConfirmPaymentDto } from './dto/confirm-payment.dto';
 import { CreateProofPaymentDto } from './dto/create-proof-payment.dto';
-import { InitiateWebpayDto } from './dto/initiate-webpay.dto';
-import { WebpayCallbackDto } from './dto/webpay-callback.dto';
 import { ValidateProofDto } from './dto/validate-proof.dto';
 import { Payment, PaymentStatus } from '../database/schemas';
 import { S3Service } from '../s3/s3.service';
-import { WebpayService } from './webpay.service';
 
 @Injectable()
 export class PaymentService {
   constructor(
     private paymentRepository: PaymentRepository,
     private s3Service: S3Service,
-    private webpayService: WebpayService,
   ) {}
 
   async create(createPaymentDto: CreatePaymentDto): Promise<Payment> {
@@ -197,13 +193,59 @@ export class PaymentService {
    */
   async createProofPayment(
     createProofPaymentDto: CreateProofPaymentDto,
+    file?: Express.Multer.File,
   ): Promise<Payment> {
+    let proofUrl = createProofPaymentDto.proofUrl;
+
+    // If file is provided, upload to S3
+    if (file) {
+      // Validate file type
+      if (!file.mimetype.startsWith('image/')) {
+        throw new BadRequestException('Only image files are allowed');
+      }
+
+      // Validate file size (max 5MB)
+      const maxSize = 5 * 1024 * 1024;
+      if (file.size > maxSize) {
+        throw new BadRequestException('File size must not exceed 5MB');
+      }
+
+      const timestamp = Date.now();
+      const filename = `${timestamp}-${file.originalname}`;
+      const folder = `payment-proofs/${createProofPaymentDto.cartId}`;
+      const key = `${folder}/${filename}`;
+
+      const uploadResult = await this.s3Service.uploadFile(
+        file.buffer,
+        key,
+        file.mimetype,
+        {
+          'uploaded-at': new Date().toISOString(),
+          'original-name': file.originalname,
+          'cart-id': createProofPaymentDto.cartId,
+        },
+      );
+
+      if (!uploadResult.success) {
+        throw new BadRequestException(
+          uploadResult.error || 'Failed to upload proof file',
+        );
+      }
+
+      proofUrl = uploadResult.url;
+    }
+
+    // Validate that we have a proof URL (either from file upload or provided)
+    if (!proofUrl) {
+      throw new BadRequestException('Proof URL or file is required');
+    }
+
     const payment = await this.paymentRepository.create({
       cartId: createProofPaymentDto.cartId,
       paymentMethodId: createProofPaymentDto.paymentMethodId,
       amount: createProofPaymentDto.amount.toString(),
       status: 'processing', // Proof-based payments start in processing status
-      proofUrl: createProofPaymentDto.proofUrl,
+      proofUrl: proofUrl,
       externalReference: createProofPaymentDto.externalReference,
       notes: createProofPaymentDto.notes,
     });
@@ -248,96 +290,6 @@ export class PaymentService {
 
       if (!updatedPayment) {
         throw new NotFoundException(`Payment with ID ${id} not found`);
-      }
-
-      return updatedPayment;
-    }
-  }
-
-  /**
-   * Initiate a Webpay payment
-   */
-  async initiateWebpayPayment(initiateWebpayDto: InitiateWebpayDto): Promise<{
-    payment: Payment;
-    webpayUrl: string;
-    webpayToken: string;
-  }> {
-    // Create payment record with pending status
-    const payment = await this.paymentRepository.create({
-      cartId: initiateWebpayDto.cartId,
-      paymentMethodId: initiateWebpayDto.metadata?.paymentMethodId,
-      amount: initiateWebpayDto.amount.toString(),
-      status: 'pending',
-      metadata: initiateWebpayDto.metadata,
-    });
-
-    // Initiate Webpay transaction
-    const webpayResponse =
-      await this.webpayService.initiateTransaction(initiateWebpayDto);
-
-    // Update payment with Webpay token
-    await this.paymentRepository.update(payment.id, {
-      externalReference: webpayResponse.token,
-      notes: `Webpay transaction initiated. Token: ${webpayResponse.token}`,
-    });
-
-    return {
-      payment,
-      webpayUrl: webpayResponse.url,
-      webpayToken: webpayResponse.token,
-    };
-  }
-
-  /**
-   * Handle Webpay callback
-   */
-  async handleWebpayCallback(
-    webpayCallbackDto: WebpayCallbackDto,
-  ): Promise<Payment> {
-    // Find payment by external reference (Webpay token)
-    const payments = await this.paymentRepository.findAll();
-    const payment = payments.find(
-      (p) => p.externalReference === webpayCallbackDto.token,
-    );
-
-    if (!payment) {
-      throw new NotFoundException(
-        `Payment with Webpay token ${webpayCallbackDto.token} not found`,
-      );
-    }
-
-    // Verify transaction with Webpay
-    const verificationResult =
-      await this.webpayService.verifyTransaction(webpayCallbackDto);
-
-    if (verificationResult.success) {
-      // Payment successful - update to completed
-      const updatedPayment = await this.paymentRepository.update(payment.id, {
-        status: 'completed',
-        transactionId: verificationResult.transactionId,
-        confirmedAt: new Date(),
-        paymentDate: new Date(),
-        metadata: {
-          ...(payment.metadata as Record<string, any> || {}),
-          authorizationCode: verificationResult.authorizationCode,
-          webpayStatus: verificationResult.status,
-        },
-      });
-
-      if (!updatedPayment) {
-        throw new NotFoundException(`Payment with ID ${payment.id} not found`);
-      }
-
-      return updatedPayment;
-    } else {
-      // Payment failed
-      const updatedPayment = await this.paymentRepository.update(payment.id, {
-        status: 'failed',
-        notes: `Webpay transaction failed: ${verificationResult.error}`,
-      });
-
-      if (!updatedPayment) {
-        throw new NotFoundException(`Payment with ID ${payment.id} not found`);
       }
 
       return updatedPayment;

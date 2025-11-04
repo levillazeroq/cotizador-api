@@ -9,16 +9,25 @@ import {
   Query,
   HttpCode,
   HttpStatus,
+  UploadedFile,
+  UseInterceptors,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiParam,
+  ApiQuery,
+  ApiConsumes,
+  ApiBody,
+} from '@nestjs/swagger';
 import { PaymentService } from './payment.service';
 import { CreatePaymentDto } from './dto/create-payment.dto';
 import { UpdatePaymentDto } from './dto/update-payment.dto';
 import { UploadProofDto } from './dto/upload-proof.dto';
 import { ConfirmPaymentDto } from './dto/confirm-payment.dto';
 import { CreateProofPaymentDto } from './dto/create-proof-payment.dto';
-import { InitiateWebpayDto } from './dto/initiate-webpay.dto';
-import { WebpayCallbackDto } from './dto/webpay-callback.dto';
 import { ValidateProofDto } from './dto/validate-proof.dto';
 import { PaymentStatus } from '../database/schemas';
 
@@ -37,7 +46,18 @@ export class PaymentController {
 
   @Get()
   @ApiOperation({ summary: 'Get all payments' })
-  @ApiQuery({ name: 'status', required: false, enum: ['pending', 'processing', 'completed', 'failed', 'cancelled', 'refunded'] })
+  @ApiQuery({
+    name: 'status',
+    required: false,
+    enum: [
+      'pending',
+      'processing',
+      'completed',
+      'failed',
+      'cancelled',
+      'refunded',
+    ],
+  })
   @ApiResponse({ status: 200, description: 'Payments retrieved successfully' })
   async findAll(@Query('status') status?: PaymentStatus) {
     if (status) {
@@ -49,7 +69,10 @@ export class PaymentController {
   @Get('cart/:cartId')
   @ApiOperation({ summary: 'Get all payments for a cart' })
   @ApiParam({ name: 'cartId', description: 'Cart ID' })
-  @ApiResponse({ status: 200, description: 'Cart payments retrieved successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Cart payments retrieved successfully',
+  })
   async findByCartId(@Param('cartId') cartId: string) {
     return await this.paymentService.findByCartId(cartId);
   }
@@ -57,7 +80,10 @@ export class PaymentController {
   @Get('cart/:cartId/stats')
   @ApiOperation({ summary: 'Get payment statistics for a cart' })
   @ApiParam({ name: 'cartId', description: 'Cart ID' })
-  @ApiResponse({ status: 200, description: 'Payment stats retrieved successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Payment stats retrieved successfully',
+  })
   async getCartPaymentStats(@Param('cartId') cartId: string) {
     return await this.paymentService.getPaymentStats(cartId);
   }
@@ -86,7 +112,10 @@ export class PaymentController {
   @Patch(':id/status')
   @ApiOperation({ summary: 'Update payment status' })
   @ApiParam({ name: 'id', description: 'Payment ID' })
-  @ApiResponse({ status: 200, description: 'Payment status updated successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Payment status updated successfully',
+  })
   @ApiResponse({ status: 400, description: 'Invalid status transition' })
   @ApiResponse({ status: 404, description: 'Payment not found' })
   async updateStatus(
@@ -99,7 +128,10 @@ export class PaymentController {
   @Patch(':id/upload-proof')
   @ApiOperation({ summary: 'Upload payment proof' })
   @ApiParam({ name: 'id', description: 'Payment ID' })
-  @ApiResponse({ status: 200, description: 'Payment proof uploaded successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Payment proof uploaded successfully',
+  })
   @ApiResponse({ status: 404, description: 'Payment not found' })
   async uploadProof(
     @Param('id') id: string,
@@ -138,7 +170,10 @@ export class PaymentController {
   @ApiOperation({ summary: 'Refund payment' })
   @ApiParam({ name: 'id', description: 'Payment ID' })
   @ApiResponse({ status: 200, description: 'Payment refunded successfully' })
-  @ApiResponse({ status: 400, description: 'Can only refund completed payments' })
+  @ApiResponse({
+    status: 400,
+    description: 'Can only refund completed payments',
+  })
   @ApiResponse({ status: 404, description: 'Payment not found' })
   async refundPayment(
     @Param('id') id: string,
@@ -149,16 +184,51 @@ export class PaymentController {
 
   @Post('proof')
   @ApiOperation({ summary: 'Create a proof-based payment (check or transfer)' })
-  @ApiResponse({ status: 201, description: 'Proof payment created successfully' })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['cartId', 'paymentMethodId', 'amount', 'file'],
+      properties: {
+        cartId: { type: 'string', description: 'Cart ID' },
+        paymentMethodId: { type: 'string', description: 'Payment Method ID' },
+        amount: { type: 'number', description: 'Payment amount' },
+        file: {
+          type: 'string',
+          format: 'binary',
+          description: 'Payment proof file',
+        },
+        externalReference: {
+          type: 'string',
+          description: 'External reference (optional)',
+        },
+        notes: { type: 'string', description: 'Additional notes (optional)' },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Proof payment created successfully',
+  })
   @ApiResponse({ status: 400, description: 'Bad request' })
-  async createProofPayment(@Body() createProofPaymentDto: CreateProofPaymentDto) {
-    return await this.paymentService.createProofPayment(createProofPaymentDto);
+  @UseInterceptors(FileInterceptor('file'))
+  async createProofPayment(
+    @Body() createProofPaymentDto: CreateProofPaymentDto,
+    @UploadedFile() file?: Express.Multer.File,
+  ) {
+    return await this.paymentService.createProofPayment(
+      createProofPaymentDto,
+      file,
+    );
   }
 
   @Patch(':id/validate-proof')
   @ApiOperation({ summary: 'Validate payment proof (admin only)' })
   @ApiParam({ name: 'id', description: 'Payment ID' })
-  @ApiResponse({ status: 200, description: 'Payment proof validated successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Payment proof validated successfully',
+  })
   @ApiResponse({ status: 400, description: 'Payment does not have a proof' })
   @ApiResponse({ status: 404, description: 'Payment not found' })
   async validateProof(
@@ -166,25 +236,6 @@ export class PaymentController {
     @Body() validateProofDto: ValidateProofDto,
   ) {
     return await this.paymentService.validateProof(id, validateProofDto);
-  }
-
-  @Post('webpay/initiate')
-  @ApiOperation({ summary: 'Initiate a Webpay payment' })
-  @ApiResponse({
-    status: 201,
-    description: 'Webpay payment initiated successfully',
-  })
-  @ApiResponse({ status: 400, description: 'Bad request' })
-  async initiateWebpayPayment(@Body() initiateWebpayDto: InitiateWebpayDto) {
-    return await this.paymentService.initiateWebpayPayment(initiateWebpayDto);
-  }
-
-  @Post('webpay/callback')
-  @ApiOperation({ summary: 'Handle Webpay callback' })
-  @ApiResponse({ status: 200, description: 'Webpay callback processed successfully' })
-  @ApiResponse({ status: 404, description: 'Payment not found' })
-  async handleWebpayCallback(@Body() webpayCallbackDto: WebpayCallbackDto) {
-    return await this.paymentService.handleWebpayCallback(webpayCallbackDto);
   }
 
   @Delete(':id')
@@ -197,4 +248,3 @@ export class PaymentController {
     await this.paymentService.delete(id);
   }
 }
-
