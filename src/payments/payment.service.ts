@@ -13,6 +13,7 @@ import { ValidateProofDto } from './dto/validate-proof.dto';
 import { Payment, PaymentStatus } from '../database/schemas';
 import { S3Service } from '../s3/s3.service';
 import { ConversationsService } from '../conversations/conversations.service';
+import { CartService } from '../carts/cart.service';
 
 @Injectable()
 export class PaymentService {
@@ -20,6 +21,7 @@ export class PaymentService {
     private paymentRepository: PaymentRepository,
     private s3Service: S3Service,
     private conversationsService: ConversationsService,
+    private cartService: CartService,
   ) {}
 
   async create(createPaymentDto: CreatePaymentDto): Promise<Payment> {
@@ -57,7 +59,10 @@ export class PaymentService {
     return await this.paymentRepository.findByStatus(status);
   }
 
-  async update(id: string, updatePaymentDto: UpdatePaymentDto): Promise<Payment> {
+  async update(
+    id: string,
+    updatePaymentDto: UpdatePaymentDto,
+  ): Promise<Payment> {
     const existingPayment = await this.findById(id);
 
     const updatedPayment = await this.paymentRepository.update(id, {
@@ -80,7 +85,10 @@ export class PaymentService {
     // Validate status transition
     this.validateStatusTransition(existingPayment.status, status);
 
-    const updatedPayment = await this.paymentRepository.updateStatus(id, status);
+    const updatedPayment = await this.paymentRepository.updateStatus(
+      id,
+      status,
+    );
 
     if (!updatedPayment) {
       throw new NotFoundException(`Payment with ID ${id} not found`);
@@ -204,60 +212,80 @@ export class PaymentService {
   ): Promise<Payment> {
     let proofUrl = createProofPaymentDto.proofUrl;
 
-    // If file is provided, upload to S3
-    if (file) {
-      // Validate file type
-      if (!file.mimetype.startsWith('image/')) {
-        throw new BadRequestException('Only image files are allowed');
-      }
-
-      // Validate file size (max 5MB)
-      const maxSize = 5 * 1024 * 1024;
-      if (file.size > maxSize) {
-        throw new BadRequestException('File size must not exceed 5MB');
-      }
-
-      const timestamp = Date.now();
-      const filename = `${timestamp}-${file.originalname}`;
-      const folder = `payment-proofs/${createProofPaymentDto.cartId}`;
-      const key = `${folder}/${filename}`;
-
-      const uploadResult = await this.s3Service.uploadFile(
-        file.buffer,
-        key,
-        file.mimetype,
-        {
-          'uploaded-at': new Date().toISOString(),
-          'original-name': file.originalname,
-          'cart-id': createProofPaymentDto.cartId,
-        },
+    try {
+      const cart = await this.cartService.getCartById(
+        createProofPaymentDto.cartId,
       );
 
-      if (!uploadResult.success) {
-        throw new BadRequestException(
-          uploadResult.error || 'Failed to upload proof file',
+      if (!cart) {
+        throw new NotFoundException(
+          `Cart with ID ${createProofPaymentDto.cartId} not found`,
         );
       }
 
-      proofUrl = uploadResult.url;
+      // If file is provided, upload to S3
+      if (file) {
+        // Validate file type
+        if (!file.mimetype.startsWith('image/')) {
+          throw new BadRequestException('Only image files are allowed');
+        }
+
+        // Validate file size (max 5MB)
+        const maxSize = 5 * 1024 * 1024;
+        if (file.size > maxSize) {
+          throw new BadRequestException('File size must not exceed 5MB');
+        }
+
+        const timestamp = Date.now();
+        const filename = `${timestamp}-${file.originalname}`;
+        const folder = `payment-proofs/${createProofPaymentDto.cartId}`;
+        const key = `${folder}/${filename}`;
+
+        const uploadResult = await this.s3Service.uploadFile(
+          file.buffer,
+          key,
+          file.mimetype,
+          {
+            'uploaded-at': new Date().toISOString(),
+            'original-name': file.originalname,
+            'cart-id': createProofPaymentDto.cartId,
+          },
+        );
+
+        if (!uploadResult.success) {
+          throw new BadRequestException(
+            uploadResult.error || 'Failed to upload proof file',
+          );
+        }
+
+        proofUrl = uploadResult.url;
+      }
+
+      // Validate that we have a proof URL (either from file upload or provided)
+      if (!proofUrl) {
+        throw new BadRequestException('Proof URL or file is required');
+      }
+
+      const payment = await this.paymentRepository.create({
+        cartId: createProofPaymentDto.cartId,
+        paymentMethodId: createProofPaymentDto.paymentMethodId,
+        amount: createProofPaymentDto.amount.toString(),
+        status: 'processing', // Proof-based payments start in processing status
+        proofUrl: proofUrl,
+        externalReference: createProofPaymentDto.externalReference,
+        notes: createProofPaymentDto.notes,
+      });
+
+      await this.conversationsService.updateConversationCustomStatus(
+        cart.conversationId,
+        'Verificando pago',
+      );
+
+      return payment;
+    } catch (error) {
+      console.error('Failed to create payment', error);
+      throw new BadRequestException('Failed to create payment', error);
     }
-
-    // Validate that we have a proof URL (either from file upload or provided)
-    if (!proofUrl) {
-      throw new BadRequestException('Proof URL or file is required');
-    }
-
-    const payment = await this.paymentRepository.create({
-      cartId: createProofPaymentDto.cartId,
-      paymentMethodId: createProofPaymentDto.paymentMethodId,
-      amount: createProofPaymentDto.amount.toString(),
-      status: 'processing', // Proof-based payments start in processing status
-      proofUrl: proofUrl,
-      externalReference: createProofPaymentDto.externalReference,
-      notes: createProofPaymentDto.notes,
-    });
-
-    return payment;
   }
 
   /**
@@ -270,7 +298,9 @@ export class PaymentService {
     const existingPayment = await this.findById(id);
 
     if (!existingPayment.proofUrl) {
-      throw new BadRequestException('Payment does not have a proof to validate');
+      throw new BadRequestException(
+        'Payment does not have a proof to validate',
+      );
     }
 
     if (validateProofDto.isValid) {
@@ -325,4 +355,3 @@ export class PaymentService {
     }
   }
 }
-
