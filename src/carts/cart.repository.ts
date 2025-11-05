@@ -230,6 +230,7 @@ export class CartRepository {
         quantity: quantity,
         name: product.name,
         sku: product.sku,
+        description: product.description || null,
         price: productPrice,
       };
 

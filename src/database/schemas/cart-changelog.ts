@@ -10,6 +10,7 @@ export const cartChangelog = pgTable('cart_changelog', {
   productId: varchar('product_id', { length: 255 }).notNull(),
   productName: text('product_name').notNull(),
   sku: varchar('sku', { length: 100 }),
+  description: text('description'),
   operation: varchar('operation', { length: 10 }).notNull(), // 'add' or 'remove'
   quantity: integer('quantity').notNull(),
   price: varchar('price', { length: 50 }),

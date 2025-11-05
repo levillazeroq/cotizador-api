@@ -11,6 +11,7 @@ export const cartItems = pgTable('cart_items', {
   sku: varchar('sku', { length: 100 }).notNull(),
   size: varchar('size', { length: 50 }),
   color: varchar('color', { length: 50 }),
+  description: text('description'),
   price: decimal('price', { precision: 10, scale: 2 }).notNull(),
   quantity: integer('quantity').notNull().default(1),
   imageUrl: text('image_url'),
