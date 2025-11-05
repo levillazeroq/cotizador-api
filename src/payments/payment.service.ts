@@ -12,12 +12,14 @@ import { CreateProofPaymentDto } from './dto/create-proof-payment.dto';
 import { ValidateProofDto } from './dto/validate-proof.dto';
 import { Payment, PaymentStatus } from '../database/schemas';
 import { S3Service } from '../s3/s3.service';
+import { ConversationsService } from '../conversations/conversations.service';
 
 @Injectable()
 export class PaymentService {
   constructor(
     private paymentRepository: PaymentRepository,
     private s3Service: S3Service,
+    private conversationsService: ConversationsService,
   ) {}
 
   async create(createPaymentDto: CreatePaymentDto): Promise<Payment> {
@@ -26,6 +28,11 @@ export class PaymentService {
       amount: createPaymentDto.amount.toString(),
       status: createPaymentDto.status || 'pending',
     });
+
+    await this.conversationsService.updateConversationCustomStatus(
+      createPaymentDto.cartId,
+      'Pagando',
+    );
 
     return payment;
   }

@@ -11,6 +11,7 @@ import { CartModule } from './carts/cart.module';
 import { InventoryModule } from './inventory/inventory.module';
 import { S3Module } from './s3/s3.module';
 import { PaymentModule } from './payments/payment.module';
+import { ConversationsService } from './conversations/conversations.service';
 
 @Module({
   imports: [
@@ -29,6 +30,6 @@ import { PaymentModule } from './payments/payment.module';
     PaymentModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [AppService, ConversationsService],
 })
 export class AppModule {}
