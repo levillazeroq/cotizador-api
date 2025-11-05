@@ -131,6 +131,10 @@ export class CartService {
     // Clear existing items
     // await this.cartRepository.deleteCartItemsByCartId(id)
 
+    if (updateCartDto.suggestions && updateCartDto.suggestions.length > 0) {
+      await this.updateCartSuggestions(id, { suggestions: updateCartDto.suggestions });
+    }
+
     // Add new items
     if (updateCartDto.items && updateCartDto.items.length > 0) {
       for (const item of updateCartDto.items) {

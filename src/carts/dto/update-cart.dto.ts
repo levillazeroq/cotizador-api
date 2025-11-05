@@ -50,4 +50,20 @@ export class UpdateCartDto {
   @IsOptional()
   @IsString()
   documentNumber?: string
+
+  // add suggestions to the cart
+  @ApiPropertyOptional({
+    description: 'Sugerencias de productos para agregar al carrito',
+    example: [
+      {
+        productId: 'prod_123456',
+        quantity: 1,
+      },
+    ],
+  })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CreateCartItemDto)
+  suggestions?: CreateCartItemDto[]
 }
