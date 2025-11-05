@@ -31,7 +31,7 @@ export class PaymentService {
 
     await this.conversationsService.updateConversationCustomStatus(
       createPaymentDto.cartId,
-      'Pagando',
+      'Verificando pago',
     );
 
     return payment;
