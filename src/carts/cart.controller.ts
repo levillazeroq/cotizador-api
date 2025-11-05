@@ -8,22 +8,29 @@ import {
   Param,
   HttpCode,
   HttpStatus,
+  UploadedFile,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import {
   ApiTags,
   ApiOperation,
   ApiResponse,
   ApiParam,
   ApiBody,
+  ApiConsumes,
 } from '@nestjs/swagger';
 import { CartService } from './cart.service';
 import { CreateCartDto } from './dto/create-cart.dto';
 import { UpdateCartDto } from './dto/update-cart.dto';
 import { UpdateCustomizationDto } from './dto/update-customization.dto';
-import { CartResponseDto } from './dto/cart-response.dto';
-import { QuoteListItemDto } from './dto/quote-list-item.dto';
-import { ChangelogItemResponseDto } from './dto/changelog-item-response.dto';
-import { ErrorResponseDto } from './dto/error-response.dto';
+import { AddPaymentProofDto } from './dto/responses/add-payment-proof.dto';
+import { CreateProofPaymentDto } from '../payments/dto/create-proof-payment.dto';
+import { CartResponseDto } from './dto/responses/cart-response.dto';
+import { QuoteListItemDto } from './dto/responses/quote-list-item.dto';
+import { ChangelogItemResponseDto } from './dto/responses/changelog-item-response.dto';
+import { ErrorResponseDto } from './dto/responses/error-response.dto';
+import { PaymentResponseDto } from '../payments/dto/payment-response.dto';
 
 @ApiTags('carts')
 @Controller('cart')
@@ -205,5 +212,38 @@ export class CartController {
   @Get(':id/changelog')
   async getCartChangelog(@Param('id') id: string) {
     return await this.cartService.getCartChangelog(id);
+  }
+
+  @ApiOperation({
+    summary: 'Agregar pago con comprobante al carrito',
+    description:
+      'Crea un pago con comprobante (cheque o transferencia) para el carrito. El archivo del comprobante se sube automáticamente a S3.',
+  })
+  @ApiParam({
+    name: 'id',
+    description: 'ID único del carrito',
+    example: 'cart_123456',
+    type: String,
+  })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({ type: AddPaymentProofDto })
+  @ApiResponse({ status: 201, type: PaymentResponseDto })
+  @ApiResponse({ status: 400, type: ErrorResponseDto })
+  @ApiResponse({ status: 404, type: ErrorResponseDto })
+  @Post(':id/payment-proof')
+  @HttpCode(HttpStatus.CREATED)
+  @UseInterceptors(FileInterceptor('file'))
+  async addPaymentWithProof(
+    @Param('id') cartId: string,
+    @Body() addPaymentProofDto: AddPaymentProofDto,
+    @UploadedFile() file?: Express.Multer.File,
+  ) {
+    const payment = await this.cartService.addPaymentWithProof(
+      cartId,
+      { ...addPaymentProofDto, cartId },
+      file,
+    );
+
+    return payment;
   }
 }

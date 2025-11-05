@@ -66,28 +66,6 @@ export class PaymentController {
     return await this.paymentService.findAll();
   }
 
-  @Get('cart/:cartId')
-  @ApiOperation({ summary: 'Get all payments for a cart' })
-  @ApiParam({ name: 'cartId', description: 'Cart ID' })
-  @ApiResponse({
-    status: 200,
-    description: 'Cart payments retrieved successfully',
-  })
-  async findByCartId(@Param('cartId') cartId: string) {
-    return await this.paymentService.findByCartId(cartId);
-  }
-
-  @Get('cart/:cartId/stats')
-  @ApiOperation({ summary: 'Get payment statistics for a cart' })
-  @ApiParam({ name: 'cartId', description: 'Cart ID' })
-  @ApiResponse({
-    status: 200,
-    description: 'Payment stats retrieved successfully',
-  })
-  async getCartPaymentStats(@Param('cartId') cartId: string) {
-    return await this.paymentService.getPaymentStats(cartId);
-  }
-
   @Get(':id')
   @ApiOperation({ summary: 'Get payment by ID' })
   @ApiParam({ name: 'id', description: 'Payment ID' })

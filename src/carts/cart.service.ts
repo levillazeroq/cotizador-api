@@ -8,13 +8,13 @@ import { CartChangelogRepository } from './cart-changelog.repository';
 import { CreateCartDto } from './dto/create-cart.dto';
 import { UpdateCartDto } from './dto/update-cart.dto';
 import { UpdateCustomizationDto } from './dto/update-customization.dto';
-import {
-  Cart, CartItemRecord,
-  NewCartItem
-} from '../database/schemas';
+import { Cart, CartItemRecord, NewCartItem } from '../database/schemas';
 import { CartGateway } from './cart.gateway';
 import { ProductsService } from '../products/products.service';
 import { UpdateCartSuggestionsDto } from './dto/update-cart-suggestions.dto';
+import { PaymentService } from '../payments/payment.service';
+import { CreateProofPaymentDto } from '../payments/dto/create-proof-payment.dto';
+import { ConversationsService } from '../conversations/conversations.service';
 
 @Injectable()
 export class CartService {
@@ -23,12 +23,15 @@ export class CartService {
     private readonly cartChangelogRepository: CartChangelogRepository,
     private readonly cartGateway: CartGateway,
     private readonly productsService: ProductsService,
+    private readonly paymentService: PaymentService,
+    private readonly conversationsService: ConversationsService,
   ) {}
 
   async createCart(
     createCartDto: CreateCartDto,
   ): Promise<Cart & { items: CartItemRecord[] }> {
-    const { conversationId, items, fullName, documentType, documentNumber } = createCartDto;
+    const { conversationId, items, fullName, documentType, documentNumber } =
+      createCartDto;
 
     // Create new cart with conversation_id and customer info
     const newCart = await this.cartRepository.create({
@@ -132,7 +135,9 @@ export class CartService {
     // await this.cartRepository.deleteCartItemsByCartId(id)
 
     if (updateCartDto.suggestions && updateCartDto.suggestions.length > 0) {
-      await this.updateCartSuggestions(id, { suggestions: updateCartDto.suggestions });
+      await this.updateCartSuggestions(id, {
+        suggestions: updateCartDto.suggestions,
+      });
     }
 
     // Add new items
@@ -195,9 +200,15 @@ export class CartService {
     const updatedCart = await this.cartRepository.update(id, {
       totalItems,
       totalPrice,
-      ...(updateCartDto.fullName !== undefined && { fullName: updateCartDto.fullName }),
-      ...(updateCartDto.documentType !== undefined && { documentType: updateCartDto.documentType }),
-      ...(updateCartDto.documentNumber !== undefined && { documentNumber: updateCartDto.documentNumber }),
+      ...(updateCartDto.fullName !== undefined && {
+        fullName: updateCartDto.fullName,
+      }),
+      ...(updateCartDto.documentType !== undefined && {
+        documentType: updateCartDto.documentType,
+      }),
+      ...(updateCartDto.documentNumber !== undefined && {
+        documentNumber: updateCartDto.documentNumber,
+      }),
     });
 
     if (!updatedCart) {
@@ -325,7 +336,7 @@ export class CartService {
    */
   async getCartChangelogByOperation(
     cartId: string,
-    operation: 'add' | 'remove'
+    operation: 'add' | 'remove',
   ) {
     const cart = await this.cartRepository.findById(cartId);
     if (!cart) {
@@ -334,7 +345,35 @@ export class CartService {
 
     return await this.cartChangelogRepository.findByCartIdAndOperation(
       cartId,
-      operation
+      operation,
     );
+  }
+
+  /**
+   * Agrega un pago con comprobante al carrito y actualiza el estado a 'Verificando pago'
+   */
+  async addPaymentWithProof(
+    cartId: string,
+    createProofPaymentDto: CreateProofPaymentDto,
+    file?: Express.Multer.File,
+  ) {
+    // Verificar que el carrito existe
+    const cart = await this.cartRepository.findById(cartId);
+    if (!cart) {
+      throw new NotFoundException(`Cart with ID ${cartId} not found`);
+    }
+    // Crear el pago con comprobante
+    const payment = await this.paymentService.createProofPayment(
+      { ...createProofPaymentDto, cartId },
+      file,
+    );
+
+    // Actualizar el estado de la conversación a 'Verificando pago'
+    await this.conversationsService.updateConversationCustomStatus(
+      cart.conversationId,
+      'Verificando pago',
+    );
+
+    return payment;
   }
 }

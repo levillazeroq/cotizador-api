@@ -1,16 +1,24 @@
-import { Module } from '@nestjs/common'
-import { CartService } from './cart.service'
-import { CartController } from './cart.controller'
-import { CartRepository } from './cart.repository'
-import { CartChangelogRepository } from './cart-changelog.repository'
-import { CartGateway } from './cart.gateway'
-import { DatabaseModule } from '../database/database.module'
-import { ProductsModule } from '../products/products.module'
+import { Module } from '@nestjs/common';
+import { CartService } from './cart.service';
+import { CartController } from './cart.controller';
+import { CartRepository } from './cart.repository';
+import { CartChangelogRepository } from './cart-changelog.repository';
+import { CartGateway } from './cart.gateway';
+import { DatabaseModule } from '../database/database.module';
+import { ProductsModule } from '../products/products.module';
+import { PaymentModule } from '../payments/payment.module';
+import { ConversationsService } from '../conversations/conversations.service';
 
 @Module({
-  imports: [DatabaseModule, ProductsModule],
+  imports: [DatabaseModule, ProductsModule, PaymentModule],
   controllers: [CartController],
-  providers: [CartService, CartRepository, CartChangelogRepository, CartGateway],
+  providers: [
+    CartService,
+    CartRepository,
+    CartChangelogRepository,
+    CartGateway,
+    ConversationsService,
+  ],
   exports: [CartService, CartGateway],
 })
 export class CartModule {}
