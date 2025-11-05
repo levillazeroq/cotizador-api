@@ -68,6 +68,16 @@ export class ProductsService {
     );
   }
 
+  async getProductById(id: string): Promise<any> {
+    const response = await this.apiClient.get(`/products/${id}`);
+    return response.data;
+  }
+
+  async getProducts(): Promise<any> {
+    const response = await this.apiClient.get('/products');
+    return response.data;
+  }
+
   // GET request
   async get<T = any>(url: string, params?: any): Promise<T> {
     const response = await this.apiClient.get(url, { params });

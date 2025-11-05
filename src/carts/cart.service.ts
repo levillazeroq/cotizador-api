@@ -14,6 +14,7 @@ import {
 } from '../database/schemas';
 import { CartGateway } from './cart.gateway';
 import { ProductsService } from '../products/products.service';
+import { UpdateCartSuggestionsDto } from './dto/update-cart-suggestions.dto';
 
 @Injectable()
 export class CartService {
@@ -134,8 +135,8 @@ export class CartService {
     if (updateCartDto.items && updateCartDto.items.length > 0) {
       for (const item of updateCartDto.items) {
         // Fetch product data for changelog
-        const product = await this.productsService.get(
-          `/products/${item.productId}`,
+        const product = await this.productsService.getProductById(
+          item.productId,
         );
 
         if (!product) {
@@ -211,6 +212,54 @@ export class CartService {
     return cartWithItems;
   }
 
+  async updateCartSuggestions(
+    id: string,
+    updateCartDto: UpdateCartSuggestionsDto,
+  ): Promise<any> {
+    const existingCart = await this.cartRepository.findById(id);
+    if (!existingCart) {
+      throw new NotFoundException(`Cart with ID ${id} not found`);
+    }
+
+    // Clear existing items
+    // await this.cartRepository.deleteCartItemsByCartId(id)
+
+    const suggestions: NewCartItem[] = [];
+
+    // Add new items
+    if (updateCartDto.suggestions && updateCartDto.suggestions.length > 0) {
+      for (const item of updateCartDto.suggestions) {
+        // Fetch product data for changelog
+        const product = await this.productsService.getProductById(
+          item.productId,
+        );
+
+        if (!product) {
+          throw new NotFoundException(
+            `Product with ID ${item.productId} not found`,
+          );
+        }
+
+        const newCartItem: NewCartItem = {
+          cartId: id,
+          productId: item.productId,
+          name: product.name,
+          sku: product.sku,
+          size: product.size || null,
+          color: product.color || null,
+          price: product.price.amount,
+          quantity: Math.min(item.quantity, product.stock || item.quantity),
+          imageUrl: product.imageUrl || product.images?.[0] || null,
+        };
+
+        suggestions.push(newCartItem);
+      }
+    }
+
+    this.cartGateway.emitCartSuggestions(id, suggestions);
+
+    return suggestions;
+  }
   async updateCustomization(
     cartId: string,
     updateCustomizationDto: UpdateCustomizationDto,

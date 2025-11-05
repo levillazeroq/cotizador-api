@@ -96,6 +96,15 @@ export class CartGateway implements OnGatewayConnection, OnGatewayDisconnect {
     })
   }
 
+  emitCartSuggestions(cartId: string, suggestions: any) {
+    this.logger.log(`Emitting cart_suggestions for cart: ${cartId}`)
+    this.server.to(`cart_${cartId}`).emit('cart_suggestions', {
+      cartId,
+      suggestions,
+      timestamp: new Date().toISOString(),
+    })
+  }
+
   // Get connected clients count
   getConnectedClientsCount(): number {
     return this.connectedClients.size
