@@ -134,6 +134,8 @@ export class CartService {
     // Clear existing items
     // await this.cartRepository.deleteCartItemsByCartId(id)
 
+    console.log('updateCartDto', updateCartDto);
+
     if (updateCartDto.suggestions && updateCartDto.suggestions.length > 0) {
       await this.updateCartSuggestions(id, {
         suggestions: updateCartDto.suggestions,
@@ -231,6 +233,7 @@ export class CartService {
     id: string,
     updateCartDto: UpdateCartSuggestionsDto,
   ): Promise<any> {
+    console.log('updateCartSuggestions', id, updateCartDto);
     const existingCart = await this.cartRepository.findById(id);
     if (!existingCart) {
       throw new NotFoundException(`Cart with ID ${id} not found`);
@@ -270,6 +273,8 @@ export class CartService {
         suggestions.push(newCartItem);
       }
     }
+
+    console.log('suggestions', suggestions);
 
     this.cartGateway.emitCartSuggestions(id, suggestions);
 
