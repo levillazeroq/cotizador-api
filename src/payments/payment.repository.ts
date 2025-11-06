@@ -1,7 +1,18 @@
 import { Injectable } from '@nestjs/common';
-import { eq, desc, and } from 'drizzle-orm';
+import { eq, desc, and, gte, lte, like, or, sql, SQL } from 'drizzle-orm';
 import { DatabaseService } from '../database/database.service';
-import { payments, Payment, NewPayment, PaymentStatus } from '../database/schemas';
+import { payments, Payment, NewPayment, PaymentStatus, carts, paymentStatusEnum } from '../database/schemas';
+import { PaymentFiltersDto } from './dto/payment-filters.dto';
+
+export interface PaginatedResult<T> {
+  data: T[];
+  pagination: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
+}
 
 @Injectable()
 export class PaymentRepository {
@@ -52,6 +63,142 @@ export class PaymentRepository {
       .select()
       .from(payments)
       .orderBy(desc(payments.createdAt));
+  }
+
+  async findAllPaginated(
+    filters: PaymentFiltersDto,
+  ): Promise<PaginatedResult<Payment>> {
+    const page = filters.page || 1;
+    const limit = filters.limit || 10;
+    const offset = (page - 1) * limit;
+
+    // Build WHERE conditions
+    const conditions: SQL[] = [];
+
+    if (filters.status) {
+      conditions.push(eq(payments.status, filters.status));
+    }
+
+    if (filters.paymentMethodId) {
+      conditions.push(eq(payments.paymentMethodId, filters.paymentMethodId));
+    }
+
+    if (filters.cartId) {
+      conditions.push(eq(payments.cartId, filters.cartId));
+    }
+
+    if (filters.startDate) {
+      const startDate = new Date(filters.startDate);
+      conditions.push(gte(payments.createdAt, startDate));
+    }
+
+    if (filters.endDate) {
+      const endDate = new Date(filters.endDate);
+      conditions.push(lte(payments.createdAt, endDate));
+    }
+
+    if (filters.minAmount !== undefined) {
+      // Convert amount string to numeric for comparison
+      conditions.push(
+        sql`CAST(${payments.amount} AS DECIMAL) >= ${filters.minAmount}`,
+      );
+    }
+
+    if (filters.maxAmount !== undefined) {
+      conditions.push(
+        sql`CAST(${payments.amount} AS DECIMAL) <= ${filters.maxAmount}`,
+      );
+    }
+
+    if (filters.search) {
+      // Search in ID (partial match) - convert UUID to text for LIKE search
+      conditions.push(sql`CAST(${payments.id} AS TEXT) LIKE ${`%${filters.search}%`}`);
+    }
+
+    // If filtering by quotationId, we need to join with carts table
+    if (filters.quotationId) {
+      conditions.push(eq(carts.conversationId, filters.quotationId));
+    }
+
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+    // Determine if we need to join with carts table
+    const needsCartJoin = !!filters.quotationId;
+
+    if (needsCartJoin) {
+      // Get total count with join
+      const [countResult] = await this.databaseService.db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(payments)
+        .innerJoin(carts, eq(payments.cartId, carts.id))
+        .where(whereClause);
+
+      const total = countResult?.count || 0;
+      const totalPages = Math.ceil(total / limit);
+
+      // Get paginated data with join
+      const results = await this.databaseService.db
+        .select({
+          id: payments.id,
+          cartId: payments.cartId,
+          paymentMethodId: payments.paymentMethodId,
+          amount: payments.amount,
+          status: payments.status,
+          proofUrl: payments.proofUrl,
+          transactionId: payments.transactionId,
+          externalReference: payments.externalReference,
+          paymentDate: payments.paymentDate,
+          confirmedAt: payments.confirmedAt,
+          metadata: payments.metadata,
+          notes: payments.notes,
+          createdAt: payments.createdAt,
+          updatedAt: payments.updatedAt,
+        })
+        .from(payments)
+        .innerJoin(carts, eq(payments.cartId, carts.id))
+        .where(whereClause)
+        .orderBy(desc(payments.createdAt))
+        .limit(limit)
+        .offset(offset);
+
+      return {
+        data: results as Payment[],
+        pagination: {
+          total,
+          page,
+          limit,
+          totalPages,
+        },
+      };
+    } else {
+      // Get total count without join
+      const [countResult] = await this.databaseService.db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(payments)
+        .where(whereClause);
+
+      const total = countResult?.count || 0;
+      const totalPages = Math.ceil(total / limit);
+
+      // Get paginated data without join
+      const data = await this.databaseService.db
+        .select()
+        .from(payments)
+        .where(whereClause)
+        .orderBy(desc(payments.createdAt))
+        .limit(limit)
+        .offset(offset);
+
+      return {
+        data,
+        pagination: {
+          total,
+          page,
+          limit,
+          totalPages,
+        },
+      };
+    }
   }
 
   async update(
@@ -116,6 +263,44 @@ export class PaymentRepository {
       .where(eq(payments.id, id))
       .returning();
     return result.length > 0;
+  }
+
+  async getGlobalStats(): Promise<Array<{
+    status: string;
+    quantity: number;
+    amount: number;
+  }>> {
+    const allPayments = await this.databaseService.db
+      .select()
+      .from(payments);
+
+    // Group by status
+    const statsMap = new Map<string, { quantity: number; amount: number }>();
+    
+    // Initialize all possible statuses from enum
+    paymentStatusEnum.enumValues.forEach(status => {
+      statsMap.set(status, { quantity: 0, amount: 0 });
+    });
+
+    // Aggregate data
+    allPayments.forEach(payment => {
+      const amount = parseFloat(payment.amount);
+      const current = statsMap.get(payment.status) || { quantity: 0, amount: 0 };
+      
+      statsMap.set(payment.status, {
+        quantity: current.quantity + 1,
+        amount: current.amount + amount,
+      });
+    });
+
+    // Convert map to array
+    const stats = Array.from(statsMap.entries()).map(([status, data]) => ({
+      status,
+      quantity: data.quantity,
+      amount: data.amount,
+    }));
+
+    return stats;
   }
 
   async getPaymentStats(cartId: string): Promise<{

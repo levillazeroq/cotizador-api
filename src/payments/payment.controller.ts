@@ -29,6 +29,8 @@ import { UploadProofDto } from './dto/upload-proof.dto';
 import { ConfirmPaymentDto } from './dto/confirm-payment.dto';
 import { CreateProofPaymentDto } from './dto/create-proof-payment.dto';
 import { ValidateProofDto } from './dto/validate-proof.dto';
+import { PaymentFiltersDto } from './dto/payment-filters.dto';
+import { PaginatedPaymentsDto } from './dto/paginated-payments.dto';
 import { PaymentStatus } from '../database/schemas';
 
 @ApiTags('payments')
@@ -44,26 +46,22 @@ export class PaymentController {
     return await this.paymentService.create(createPaymentDto);
   }
 
+  @Get('stats')
+  @ApiOperation({ summary: 'Get global payment statistics' })
+  @ApiResponse({ status: 200, description: 'Statistics retrieved successfully' })
+  async getStats() {
+    return await this.paymentService.getGlobalStats();
+  }
+
   @Get()
-  @ApiOperation({ summary: 'Get all payments' })
-  @ApiQuery({
-    name: 'status',
-    required: false,
-    enum: [
-      'pending',
-      'processing',
-      'completed',
-      'failed',
-      'cancelled',
-      'refunded',
-    ],
+  @ApiOperation({ summary: 'Get all payments with pagination and filters' })
+  @ApiResponse({
+    status: 200,
+    description: 'Payments retrieved successfully',
+    type: PaginatedPaymentsDto,
   })
-  @ApiResponse({ status: 200, description: 'Payments retrieved successfully' })
-  async findAll(@Query('status') status?: PaymentStatus) {
-    if (status) {
-      return await this.paymentService.findByStatus(status);
-    }
-    return await this.paymentService.findAll();
+  async findAll(@Query() filters: PaymentFiltersDto) {
+    return await this.paymentService.findAllPaginated(filters);
   }
 
   @Get(':id')

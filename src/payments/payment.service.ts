@@ -3,13 +3,14 @@ import {
   NotFoundException,
   BadRequestException,
 } from '@nestjs/common';
-import { PaymentRepository } from './payment.repository';
+import { PaymentRepository, PaginatedResult } from './payment.repository';
 import { CreatePaymentDto } from './dto/create-payment.dto';
 import { UpdatePaymentDto } from './dto/update-payment.dto';
 import { UploadProofDto } from './dto/upload-proof.dto';
 import { ConfirmPaymentDto } from './dto/confirm-payment.dto';
 import { CreateProofPaymentDto } from './dto/create-proof-payment.dto';
 import { ValidateProofDto } from './dto/validate-proof.dto';
+import { PaymentFiltersDto } from './dto/payment-filters.dto';
 import { Payment, PaymentStatus } from '../database/schemas';
 import { S3Service } from '../s3/s3.service';
 
@@ -32,6 +33,16 @@ export class PaymentService {
 
   async findAll(): Promise<Payment[]> {
     return await this.paymentRepository.findAll();
+  }
+
+  async findAllPaginated(
+    filters: PaymentFiltersDto,
+  ): Promise<PaginatedResult<Payment>> {
+    return await this.paymentRepository.findAllPaginated(filters);
+  }
+
+  async getGlobalStats() {
+    return await this.paymentRepository.getGlobalStats();
   }
 
   async findById(id: string): Promise<Payment> {
@@ -193,6 +204,8 @@ export class PaymentService {
   async getPaymentStats(cartId: string) {
     return await this.paymentRepository.getPaymentStats(cartId);
   }
+
+
 
   /**
    * Create a proof-based payment (check or transfer)
