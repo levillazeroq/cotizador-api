@@ -1,1 +1,0 @@
-ALTER TABLE "cart_items" ADD COLUMN "customization_values" jsonb;

@@ -1,23 +1,119 @@
-import { pgTable, text, boolean, integer, timestamp, uuid, jsonb } from 'drizzle-orm/pg-core';
+import { pgTable, text, boolean, integer, timestamp, uuid, jsonb, decimal } from 'drizzle-orm/pg-core';
+import { createInsertSchema, createSelectSchema } from 'drizzle-zod';
 
+/**
+ * Customization Fields - Sistema genérico de personalización
+ * 
+ * Este esquema permite crear campos de personalización totalmente configurables
+ * que pueden ser usados en productos, servicios, o cualquier entidad del sistema.
+ */
 export const customizationFields = pgTable('customization_fields', {
   id: uuid('id').primaryKey().defaultRandom(),
-  groupId: uuid('group_id').notNull(),
-  name: text('name').notNull(),
-  displayName: text('display_name').notNull(),
-  description: text('description'),
-  type: text('type', { enum: ['text', 'number', 'select', 'checkbox', 'textarea'] }).notNull(),
-  options: jsonb('options'), // JSON object for select options
-  isRequired: boolean('is_required').default(true),
+  
+  // Identificación y visualización
+  name: text('name').notNull().unique(), // Nombre técnico único (ej: "logo_color")
+  displayName: text('display_name').notNull(), // Nombre visible para el usuario
+  description: text('description'), // Descripción o ayuda
+  placeholder: text('placeholder'), // Texto de placeholder
+  helpText: text('help_text'), // Texto de ayuda adicional
+  
+  // Tipo de campo - Ampliado para soportar más tipos
+  type: text('type', { 
+    enum: [
+      'text',           // Texto simple
+      'textarea',       // Texto largo/multilínea
+      'number',         // Número
+      'decimal',        // Número decimal
+      'select',         // Lista desplegable
+      'multiselect',    // Selección múltiple
+      'radio',          // Botones de radio
+      'checkbox',       // Checkbox individual
+      'checkboxes',     // Múltiples checkboxes
+      'date',           // Fecha
+      'datetime',       // Fecha y hora
+      'time',           // Hora
+      'color',          // Selector de color
+      'image',          // Carga de imagen
+      'file',           // Carga de archivo
+      'url',            // URL
+      'email',          // Email
+      'phone',          // Teléfono
+      'rating',         // Calificación (estrellas)
+      'slider',         // Slider/rango
+      'toggle',         // Switch on/off
+      'tags',           // Etiquetas/tags
+    ] 
+  }).notNull(),
+  
+  // Configuración general
+  isRequired: boolean('is_required').default(false),
   isActive: boolean('is_active').default(true),
   sortOrder: integer('sort_order').default(0),
-  minValue: integer('min_value'),
-  maxValue: integer('max_value'),
+  defaultValue: text('default_value'), // Valor por defecto
+  
+  // Opciones para select, multiselect, radio, checkboxes
+  // Formato: [{ value: "red", label: "Rojo", price: 0 }, ...]
+  options: jsonb('options').$type<Array<{
+    value: string;
+    label: string;
+    price?: number;
+    description?: string;
+    imageUrl?: string;
+  }>>(),
+  
+  // Validaciones numéricas
+  minValue: decimal('min_value', { precision: 10, scale: 2 }),
+  maxValue: decimal('max_value', { precision: 10, scale: 2 }),
+  step: decimal('step', { precision: 10, scale: 2 }), // Para sliders y números
+  
+  // Validaciones de texto
+  minLength: integer('min_length'),
   maxLength: integer('max_length'),
-  imageConstraints: jsonb('image_constraints'),
+  pattern: text('pattern'), // Regex para validación
+  
+  // Configuración de imagen/archivo
+  fileConstraints: jsonb('file_constraints').$type<{
+    maxSize?: number; // En bytes
+    maxFiles?: number; // Número máximo de archivos
+    acceptedFormats?: string[]; // ['image/png', 'image/jpeg']
+    minWidth?: number;
+    minHeight?: number;
+    maxWidth?: number;
+    maxHeight?: number;
+    aspectRatio?: string; // '16:9', '4:3', etc.
+  }>(),
+  
+  // Configuración de precio (si el campo afecta el precio)
+  affectsPrice: boolean('affects_price').default(false),
+  priceModifier: decimal('price_modifier', { precision: 10, scale: 2 }), // Monto fijo o porcentaje
+  priceModifierType: text('price_modifier_type', { enum: ['fixed', 'percentage'] }),
+  
+  // Configuración UI
+  uiConfig: jsonb('ui_config').$type<{
+    columns?: number; // Ancho en grid (1-12)
+    icon?: string; // Icono a mostrar
+    color?: string; // Color del campo
+    showLabel?: boolean;
+    showHelpText?: boolean;
+    conditionalDisplay?: {
+      dependsOn: string; // ID del campo del que depende
+      condition: 'equals' | 'not_equals' | 'contains' | 'greater' | 'less';
+      value: any;
+    };
+  }>(),
+  
+  // Metadata adicional
+  metadata: jsonb('metadata'), // Cualquier dato adicional personalizado
+  
+  // Timestamps
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
 
+// Zod schemas para validación
+export const insertCustomizationFieldSchema = createInsertSchema(customizationFields);
+export const selectCustomizationFieldSchema = createSelectSchema(customizationFields);
+
+// Type exports
 export type CustomizationField = typeof customizationFields.$inferSelect;
 export type NewCustomizationField = typeof customizationFields.$inferInsert;

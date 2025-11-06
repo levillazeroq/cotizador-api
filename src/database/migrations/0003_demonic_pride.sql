@@ -1,1 +1,0 @@
-ALTER TABLE "cart_items" DROP COLUMN "max_stock";

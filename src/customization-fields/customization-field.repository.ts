@@ -14,14 +14,6 @@ export class CustomizationFieldRepository {
       .orderBy(asc(customizationFields.sortOrder), asc(customizationFields.createdAt))
   }
 
-  async findByGroupId(groupId: string): Promise<CustomizationField[]> {
-    return await this.databaseService.db
-      .select()
-      .from(customizationFields)
-      .where(eq(customizationFields.groupId, groupId))
-      .orderBy(asc(customizationFields.sortOrder), asc(customizationFields.createdAt))
-  }
-
   async findById(id: string): Promise<CustomizationField | null> {
     const result = await this.databaseService.db
       .select()
