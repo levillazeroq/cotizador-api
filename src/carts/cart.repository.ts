@@ -68,6 +68,7 @@ export class CartRepository {
       .select()
       .from(carts)
       .leftJoin(cartItems, eq(cartItems.cartId, carts.id))
+      .orderBy(desc(cartItems.createdAt))
       .where(eq(carts.id, id));
 
     if (result.length === 0) {
