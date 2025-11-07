@@ -23,6 +23,8 @@ async function bootstrap() {
   });
 
   // Swagger configuration - Se genera automáticamente en cada inicio
+  // No especificamos servidores explícitamente para que Swagger UI
+  // use automáticamente el dominio desde donde se está sirviendo
   const config = new DocumentBuilder()
     .setTitle('Cotizador Dinámico API')
     .setDescription(
@@ -37,9 +39,9 @@ async function bootstrap() {
       '- ✅ Múltiples métodos de pago\n' +
       '- ✅ WebSockets para actualizaciones en tiempo real\n' +
       '- ✅ Validación de datos con class-validator\n\n' +
-      '## URLs Base\n' +
-      '- **Desarrollo:** http://localhost:3000\n' +
-      '- **Documentación:** http://localhost:3000/docs\n\n' +
+      '## Acceso\n' +
+      '- La API se adapta automáticamente al dominio desde donde se sirve\n' +
+      '- **Documentación:** Disponible en `/docs`\n\n' +
       '## Respuestas\n' +
       'La API retorna respuestas en formato JSON. Los códigos de estado HTTP indican el resultado:\n' +
       '- `2xx` - Éxito\n' +
@@ -53,8 +55,6 @@ async function bootstrap() {
       'support@example.com'
     )
     .setLicense('MIT', 'https://opensource.org/licenses/MIT')
-    .addServer('http://localhost:3000', 'Servidor de Desarrollo')
-    .addServer('https://api.example.com', 'Servidor de Producción')
     .addTag('products', '📦 Productos - Gestión completa de catálogo de productos')
     .addTag('carts', '🛒 Carritos - Operaciones de carritos y cotizaciones')
     .addTag('customization-fields', '🎨 Campos de Personalización - Gestión de campos personalizables')
