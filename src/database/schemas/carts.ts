@@ -1,4 +1,4 @@
-import { pgTable, uuid, integer, decimal, timestamp, text, varchar, jsonb } from 'drizzle-orm/pg-core'
+import { pgTable, uuid, integer, decimal, timestamp, text, varchar, jsonb, boolean } from 'drizzle-orm/pg-core'
 import { relations } from 'drizzle-orm'
 import { createInsertSchema, createSelectSchema } from 'drizzle-zod'
 
@@ -28,9 +28,22 @@ export const carts = pgTable('carts', {
   totalPrice: decimal('total_price', { precision: 10, scale: 2 })
     .notNull()
     .default('0'),
+  
+  // Quote validity and status management
+  validUntil: timestamp('valid_until'),
+  status: varchar('status', { length: 50 }).notNull().default('draft'), // draft, active, expired, paid, cancelled
+  
+  // Price change tracking
+  priceValidatedAt: timestamp('price_validated_at'),
+  priceChangeApproved: boolean('price_change_approved').notNull().default(false),
+  priceChangeApprovedAt: timestamp('price_change_approved_at'),
+  originalTotalPrice: decimal('original_total_price', { precision: 10, scale: 2 }),
+  
+  // Customer information
   fullName: text('full_name'),
   documentType: varchar('document_type', { length: 50 }),
   documentNumber: varchar('document_number', { length: 100 }),
+  
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 })

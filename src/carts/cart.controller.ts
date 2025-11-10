@@ -21,6 +21,7 @@ import {
   ApiConsumes,
 } from '@nestjs/swagger';
 import { CartService } from './cart.service';
+import { PriceValidationService } from './services/price-validation.service';
 import { CreateCartDto } from './dto/create-cart.dto';
 import { UpdateCartDto } from './dto/update-cart.dto';
 import { UpdateCustomizationDto } from './dto/update-customization.dto';
@@ -37,6 +38,7 @@ import { PaymentResponseDto } from '../payments/dto/payment-response.dto';
 export class CartController {
   constructor(
     private readonly cartService: CartService,
+    private readonly priceValidationService: PriceValidationService,
   ) {}
 
   @ApiOperation({
@@ -246,4 +248,199 @@ export class CartController {
 
     return payment;
   }
+
+  // ============= Quote Price Validation Endpoints =============
+
+  @ApiOperation({
+    summary: 'Activar cotización con fecha de expiración',
+    description:
+      'Convierte un carrito draft en una cotización activa con fecha de expiración. Por defecto, las cotizaciones son válidas por 7 días.',
+  })
+  @ApiParam({
+    name: 'id',
+    description: 'ID único del carrito',
+    example: 'cart_123456',
+    type: String,
+  })
+  @ApiResponse({ status: 200, description: 'Cotización activada exitosamente' })
+  @ApiResponse({ status: 404, type: ErrorResponseDto })
+  @Post(':id/activate')
+  async activateQuote(@Param('id') id: string) {
+    const cart = await this.priceValidationService.activateQuote(id);
+    return {
+      id: cart.id,
+      status: cart.status,
+      validUntil: cart.validUntil,
+      message: 'Cotización activada exitosamente',
+    };
+  }
+
+  @ApiOperation({
+    summary: 'Validar precios de la cotización',
+    description:
+      'Compara los precios actuales de los productos con los precios guardados en el carrito. Retorna información sobre cambios de precio si los hay.',
+  })
+  @ApiParam({
+    name: 'id',
+    description: 'ID único del carrito',
+    example: 'cart_123456',
+    type: String,
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Validación de precios completada',
+    schema: {
+      properties: {
+        isValid: { type: 'boolean' },
+        changes: {
+          type: 'array',
+          items: {
+            properties: {
+              itemId: { type: 'string' },
+              productId: { type: 'string' },
+              name: { type: 'string' },
+              oldPrice: { type: 'number' },
+              newPrice: { type: 'number' },
+              difference: { type: 'number' },
+              percentageChange: { type: 'number' },
+            },
+          },
+        },
+        totalOldPrice: { type: 'number' },
+        totalNewPrice: { type: 'number' },
+        totalDifference: { type: 'number' },
+        totalPercentageChange: { type: 'number' },
+        requiresApproval: { type: 'boolean' },
+      },
+    },
+  })
+  @ApiResponse({ status: 404, type: ErrorResponseDto })
+  @Post(':id/validate-prices')
+  async validatePrices(@Param('id') id: string) {
+    const validation = await this.priceValidationService.validateCartPrices(id);
+    const requiresApproval = this.priceValidationService.requiresApproval(validation);
+
+    return {
+      ...validation,
+      requiresApproval,
+      message: validation.isValid
+        ? 'Los precios no han cambiado'
+        : `Se detectaron ${validation.changes.length} cambios de precio`,
+    };
+  }
+
+  @ApiOperation({
+    summary: 'Aprobar y aplicar cambios de precio',
+    description:
+      'Actualiza los precios del carrito a los precios actuales de los productos. Requiere que el cliente haya aprobado los cambios.',
+  })
+  @ApiParam({
+    name: 'id',
+    description: 'ID único del carrito',
+    example: 'cart_123456',
+    type: String,
+  })
+  @ApiBody({
+    schema: {
+      properties: {
+        approved: {
+          type: 'boolean',
+          description: 'Confirmación del cliente de que aprueba los nuevos precios',
+        },
+      },
+      required: ['approved'],
+    },
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Precios actualizados exitosamente',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'El cliente debe aprobar los cambios de precio',
+  })
+  @ApiResponse({ status: 404, type: ErrorResponseDto })
+  @Post(':id/approve-price-changes')
+  async approvePriceChanges(
+    @Param('id') id: string,
+    @Body() body: { approved: boolean },
+  ) {
+    if (!body.approved) {
+      return {
+        statusCode: HttpStatus.BAD_REQUEST,
+        message: 'El cliente debe aprobar los cambios de precio',
+        error: 'ApprovalRequired',
+      };
+    }
+
+    // Get current validation
+    const validation = await this.priceValidationService.validateCartPrices(id);
+
+    if (validation.isValid) {
+      return {
+        message: 'No hay cambios de precio para aprobar',
+        validation,
+      };
+    }
+
+    // Update prices
+    const updatedCart = await this.priceValidationService.updateCartPrices(
+      id,
+      validation.changes,
+    );
+
+    return {
+      message: 'Precios actualizados exitosamente',
+      cart: {
+        id: updatedCart.id,
+        totalPrice: parseFloat(updatedCart.totalPrice as string),
+        priceValidatedAt: updatedCart.priceValidatedAt,
+        priceChangeApproved: updatedCart.priceChangeApproved,
+      },
+      changes: validation.changes,
+    };
+  }
+
+  @ApiOperation({
+    summary: 'Validación completa pre-pago',
+    description:
+      'Realiza todas las validaciones necesarias antes de procesar un pago: expiración, estado de la cotización y precios. Si los cambios son menores, se aplican automáticamente.',
+  })
+  @ApiParam({
+    name: 'id',
+    description: 'ID único del carrito',
+    example: 'cart_123456',
+    type: String,
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Validación exitosa, listo para procesar pago',
+  })
+  @ApiResponse({
+    status: 409,
+    description: 'Los precios han cambiado y requieren aprobación del cliente',
+  })
+  @ApiResponse({
+    status: 410,
+    description: 'La cotización ha expirado',
+  })
+  @ApiResponse({ status: 404, type: ErrorResponseDto })
+  @Post(':id/validate-before-payment')
+  async validateBeforePayment(@Param('id') id: string) {
+    const result = await this.priceValidationService.validateBeforePayment(id);
+
+    return {
+      message: 'Validación completada exitosamente',
+      isValid: result.validation.isValid,
+      requiresApproval: result.requiresApproval,
+      cart: {
+        id: result.cart.id,
+        status: result.cart.status,
+        totalPrice: parseFloat(result.cart.totalPrice as string),
+        validUntil: result.cart.validUntil,
+      },
+      validation: result.validation,
+    };
+  }
+
 }

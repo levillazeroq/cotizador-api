@@ -8,6 +8,20 @@
       "when": 1762457453573,
       "tag": "0000_nappy_slapstick",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1762794391861,
+      "tag": "0001_nosy_hannibal_king",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1762795079545,
+      "tag": "0002_oval_spot",
+      "breakpoints": true
     }
   ]
 }

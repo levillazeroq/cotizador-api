@@ -214,10 +214,9 @@ export class CartRepository {
     productId: string;
     quantity: number;
   }): Promise<CartItemRecord> {
-    console.log('addCartItemByProductId', cartId, productId, quantity);
     const productItem = await this.findCartItemByProductId(cartId, productId);
     if (!productItem) {
-      const product = await this.productsService.get(`/products/${productId}`);
+      const product = await this.productsService.get(`/products/${productId}`, { include: 'media' });
 
       if (!product) {
         throw new NotFoundException(`Product with ID ${productId} not found`);
@@ -233,6 +232,7 @@ export class CartRepository {
         sku: product.sku,
         description: product.description || null,
         price: productPrice,
+        imageUrl: product.images?.[0] || null,
       };
 
       return await this.createCartItem(newCartItem);

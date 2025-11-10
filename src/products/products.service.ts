@@ -20,7 +20,6 @@ export class ProductsService {
     // Request interceptor
     this.apiClient.interceptors.request.use(
       (config) => {
-        console.log(`🚀 [Products API] ${config.method?.toUpperCase()} ${config.url}`);
         return config;
       },
       (error) => {
@@ -32,7 +31,6 @@ export class ProductsService {
     // Response interceptor
     this.apiClient.interceptors.response.use(
       (response) => {
-        console.log(`✅ [Products API] ${response.status} ${response.config.url}`);
         return response;
       },
       (error) => {
@@ -86,7 +84,6 @@ export class ProductsService {
 
   // POST request
   async post<T = any>(url: string, data?: any): Promise<T> {
-    console.log("data", data);
     const response = await this.apiClient.post(url, {...data, productType: 'simple'});
     return response.data;
   }

@@ -4,6 +4,7 @@ import { CartController } from './cart.controller';
 import { CartRepository } from './cart.repository';
 import { CartChangelogRepository } from './cart-changelog.repository';
 import { CartGateway } from './cart.gateway';
+import { PriceValidationService } from './services/price-validation.service';
 import { DatabaseModule } from '../database/database.module';
 import { ProductsModule } from '../products/products.module';
 import { PaymentModule } from '../payments/payment.module';
@@ -18,7 +19,8 @@ import { ConversationsService } from '../conversations/conversations.service';
     CartChangelogRepository,
     CartGateway,
     ConversationsService,
+    PriceValidationService,
   ],
-  exports: [CartService, CartGateway],
+  exports: [CartService, CartGateway, PriceValidationService],
 })
 export class CartModule {}
