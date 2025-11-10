@@ -270,7 +270,7 @@ export class CartService {
           description: product.description || null,
           price: product.price.amount,
           quantity: Math.min(item.quantity, product.stock || item.quantity),
-          imageUrl: product.imageUrl || product.images?.[0] || null,
+          imageUrl: product.media?.[0]?.url || null,
         };
 
         suggestions.push(newCartItem);

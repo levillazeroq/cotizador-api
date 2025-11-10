@@ -67,7 +67,7 @@ export class ProductsService {
   }
 
   async getProductById(id: string): Promise<any> {
-    const response = await this.apiClient.get(`/products/${id}`);
+    const response = await this.apiClient.get(`/products/${id}`, { params: { include: 'media' } });
     return response.data;
   }
 
