@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { eq, desc, and } from 'drizzle-orm';
+import { eq, desc, and, asc } from 'drizzle-orm';
 import { DatabaseService } from '../database/database.service';
 import {
   carts,
@@ -68,7 +68,7 @@ export class CartRepository {
       .select()
       .from(carts)
       .leftJoin(cartItems, eq(cartItems.cartId, carts.id))
-      .orderBy(desc(cartItems.createdAt))
+      .orderBy(asc(cartItems.createdAt))
       .where(eq(carts.id, id));
 
     if (result.length === 0) {
