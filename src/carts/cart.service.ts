@@ -131,11 +131,6 @@ export class CartService {
       throw new NotFoundException(`Cart with ID ${id} not found`);
     }
 
-    // Clear existing items
-    // await this.cartRepository.deleteCartItemsByCartId(id)
-
-    console.log('updateCartDto', updateCartDto);
-
     if (updateCartDto.suggestions && updateCartDto.suggestions.length > 0) {
       await this.updateCartSuggestions(id, {
         suggestions: updateCartDto.suggestions,
