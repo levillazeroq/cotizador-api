@@ -5,3 +5,4 @@ export * from './product-response.dto';
 export * from './paginated-products.dto';
 export * from './upload-products.dto';
 export * from './create-product-media.dto';
+export * from './update-product-media.dto';

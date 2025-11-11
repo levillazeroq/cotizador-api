@@ -28,7 +28,8 @@ import {
   ProductResponseDto,
   PaginatedProductsDto,
   UploadProductsResponseDto,
-  CreateProductMediaDto
+  CreateProductMediaDto,
+  UpdateProductMediaDto
 } from './dto';
 
 @ApiTags('products')
@@ -189,6 +190,39 @@ export class ProductsController {
   @HttpCode(HttpStatus.CREATED)
   async addMedia(@Param('id') id: string, @Body() media: CreateProductMediaDto) {
     return await this.productsService.post(`/products/${id}/media`, media);
+  }
+
+  @ApiOperation({
+    summary: 'Actualizar media de producto',
+    description: 'Actualiza una media específica de un producto.',
+  })
+  @ApiParam({
+    name: 'id',
+    description: 'ID del producto',
+    example: '4263',
+    type: String,
+  })
+  @ApiParam({
+    name: 'mediaId',
+    description: 'ID del media a actualizar',
+    example: 'media_123',
+    type: String,
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Media actualizado exitosamente',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Producto o media no encontrado',
+  })
+  @Put(':id/media/:mediaId')
+  async updateMedia(
+    @Param('id') id: string,
+    @Param('mediaId') mediaId: string,
+    @Body() media: UpdateProductMediaDto,
+  ) {
+    return await this.productsService.put(`/products/${id}/media/${mediaId}`, media);
   }
 
   @ApiOperation({
