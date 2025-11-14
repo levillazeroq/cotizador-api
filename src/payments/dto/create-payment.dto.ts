@@ -6,7 +6,7 @@ import {
   IsEnum,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { PaymentStatus } from '../../database/schemas';
+import { PaymentStatus, PaymentType } from '../../database/schemas';
 
 export class CreatePaymentDto {
   @ApiProperty({ description: 'Cart ID' })
@@ -42,6 +42,14 @@ export class CreatePaymentDto {
     'refunded',
   ])
   status?: PaymentStatus;
+
+  @ApiPropertyOptional({
+    description: 'Payment type',
+    enum: ['web_pay', 'bank_transfer', 'check'],
+  })
+  @IsOptional()
+  @IsEnum(['web_pay', 'bank_transfer', 'check'])
+  paymentType?: PaymentType;
 
   @ApiPropertyOptional({ description: 'Proof of payment URL' })
   @IsOptional()

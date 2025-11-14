@@ -23,6 +23,13 @@ export const paymentStatusEnum = pgEnum('payment_status', [
   'refunded',
 ]);
 
+// Payment Type Enum
+export const paymentTypeEnum = pgEnum('payment_type', [
+  'web_pay',
+  'bank_transfer',
+  'check',
+]);
+
 // Payments Table
 export const payments = pgTable('payments', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -34,6 +41,7 @@ export const payments = pgTable('payments', {
     .references(() => paymentMethods.id),
   amount: decimal('amount', { precision: 10, scale: 2 }).notNull(),
   status: paymentStatusEnum('status').notNull().default('pending'),
+  paymentType: paymentTypeEnum('payment_type'),
   proofUrl: text('proof_url'),
   transactionId: varchar('transaction_id', { length: 255 }),
   externalReference: varchar('external_reference', { length: 255 }),
@@ -69,4 +77,5 @@ export const selectPaymentSchema = createSelectSchema(payments);
 export type Payment = typeof payments.$inferSelect;
 export type NewPayment = typeof payments.$inferInsert;
 export type PaymentStatus = (typeof paymentStatusEnum.enumValues)[number];
+export type PaymentType = (typeof paymentTypeEnum.enumValues)[number];
 

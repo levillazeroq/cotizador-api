@@ -6,3 +6,4 @@ export * from './carts';
 export * from './cart-changelog';
 export * from './payments';
 export * from './organizations';
+export * from './organization-payment-methods';
