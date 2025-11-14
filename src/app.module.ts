@@ -12,12 +12,15 @@ import { InventoryModule } from './inventory/inventory.module';
 import { S3Module } from './s3/s3.module';
 import { PaymentModule } from './payments/payment.module';
 import { ConversationsService } from './conversations/conversations.service';
+// import { OrganizationModule } from './organization/organization.module';
+import configuration from './config/configuration';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: '.env',
+      load: [configuration],
     }),
     DatabaseModule,
     PaymentMethodModule, 
@@ -28,6 +31,7 @@ import { ConversationsService } from './conversations/conversations.service';
     InventoryModule,
     S3Module,
     PaymentModule,
+    // OrganizationModule,
   ],
   controllers: [AppController],
   providers: [AppService, ConversationsService],

@@ -8,12 +8,12 @@ export class ProductsService {
 
   constructor(private configService: ConfigService) {
     this.apiClient = axios.create({
-      baseURL: 'https://9gj5x92upk.execute-api.us-east-2.amazonaws.com/v1/v1',
+      baseURL: this.configService.get('products.apiUrl'),
       timeout: 10000,
       headers: {
         'Content-Type': 'application/json',
         'Authorization': '',
-        'X-Organization-ID': '11111111-1111-1111-1111-111111111333'
+        'X-Organization-ID': 2
       },
     });
 
