@@ -16,6 +16,7 @@ async function bootstrap() {
       'Origin',
       'X-Requested-With',
       'Cache-Control',
+      'X-Organization-ID',
     ],
     exposedHeaders: ['Content-Length', 'Content-Type'],
     credentials: false, // Importante: false cuando se permite cualquier origen
