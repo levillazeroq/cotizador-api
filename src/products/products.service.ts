@@ -77,38 +77,47 @@ export class ProductsService {
   }
 
   // GET request
-  async get<T = any>(url: string, params?: any): Promise<T> {
-    const response = await this.apiClient.get(url, { params });
+  async get<T = any>(url: string, params?: any, organizationId?: string): Promise<T> {
+    const response = await this.apiClient.get(url, { 
+      params,
+      headers: organizationId ? { 'X-Organization-ID': organizationId } : {}
+    });
     return response.data;
   }
 
   // POST request
-  async post<T = any>(url: string, data?: any): Promise<T> {
-    const response = await this.apiClient.post(url, {...data, productType: 'simple'});
+  async post<T = any>(url: string, data?: any, organizationId?: string): Promise<T> {
+    const response = await this.apiClient.post(url, {...data, productType: 'simple'}, {
+      headers: organizationId ? { 'X-Organization-ID': organizationId } : {}
+    });
     return response.data;
   }
 
   // PUT request
-  async put<T = any>(url: string, data?: any): Promise<T> {
+  async put<T = any>(url: string, data?: any, organizationId?: string): Promise<T> {
     const response = await this.apiClient.put(url, data, {
       headers: {
         'If-Match': new Date().getTime().toString(),
+        ...(organizationId ? { 'X-Organization-ID': organizationId } : {})
       },
     });
     return response.data;
   }
 
   // DELETE request
-  async delete<T = any>(url: string): Promise<T> {
-    const response = await this.apiClient.delete(url);
+  async delete<T = any>(url: string, organizationId?: string): Promise<T> {
+    const response = await this.apiClient.delete(url, {
+      headers: organizationId ? { 'X-Organization-ID': organizationId } : {}
+    });
     return response.data;
   }
 
   // Upload file
-  async upload<T = any>(url: string, formData: FormData): Promise<T> {
+  async upload<T = any>(url: string, formData: FormData, organizationId?: string): Promise<T> {
     const response = await this.apiClient.post(url, formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
+        ...(organizationId ? { 'X-Organization-ID': organizationId } : {})
       },
     });
     return response.data;

@@ -11,6 +11,7 @@ import {
   UploadedFile,
   HttpCode,
   HttpStatus,
+  Headers,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import {
@@ -19,6 +20,7 @@ import {
   ApiResponse,
   ApiParam,
   ApiConsumes,
+  ApiHeader,
 } from '@nestjs/swagger';
 import { ProductsService } from './products.service';
 import {
@@ -33,6 +35,11 @@ import {
 } from './dto';
 
 @ApiTags('products')
+@ApiHeader({
+  name: 'X-Organization-ID',
+  description: 'ID de la organización',
+  required: true,
+})
 @Controller('products')
 export class ProductsController {
   constructor(private readonly productsService: ProductsService) {}
@@ -47,8 +54,11 @@ export class ProductsController {
     type: PaginatedProductsDto,
   })
   @Get()
-  async getProducts(@Query() filters: ProductFiltersDto) {
-    return await this.productsService.get('/products', filters);
+  async getProducts(
+    @Query() filters: ProductFiltersDto,
+    @Headers('x-organization-id') organizationId: string,
+  ) {
+    return await this.productsService.get('/products', filters, organizationId);
   }
 
   @ApiOperation({
@@ -71,8 +81,12 @@ export class ProductsController {
     description: 'Producto no encontrado',
   })
   @Get(':id')
-  async getProduct(@Param('id') id: string, @Query() query?: any) {
-    return await this.productsService.get(`/products/${id}`, query);
+  async getProduct(
+    @Param('id') id: string,
+    @Query() query: any,
+    @Headers('x-organization-id') organizationId: string,
+  ) {
+    return await this.productsService.get(`/products/${id}`, query, organizationId);
   }
 
   @ApiOperation({
@@ -90,8 +104,11 @@ export class ProductsController {
   })
   @Post()
   @HttpCode(HttpStatus.CREATED)
-  async createProduct(@Body() createProductDto: CreateProductDto) {
-    return await this.productsService.post('/products', createProductDto);
+  async createProduct(
+    @Body() createProductDto: CreateProductDto,
+    @Headers('x-organization-id') organizationId: string,
+  ) {
+    return await this.productsService.post('/products', createProductDto, organizationId);
   }
 
   @ApiOperation({
@@ -117,8 +134,9 @@ export class ProductsController {
   async partialUpdateProduct(
     @Param('id') id: string,
     @Body() updateProductDto: UpdateProductDto,
+    @Headers('x-organization-id') organizationId: string,
   ) {
-    return await this.productsService.put(`/products/${id}`, updateProductDto);
+    return await this.productsService.put(`/products/${id}`, updateProductDto, organizationId);
   }
 
   @ApiOperation({
@@ -141,8 +159,11 @@ export class ProductsController {
   })
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
-  async deleteProduct(@Param('id') id: string) {
-    return await this.productsService.delete(`/products/${id}`);
+  async deleteProduct(
+    @Param('id') id: string,
+    @Headers('x-organization-id') organizationId: string,
+  ) {
+    return await this.productsService.delete(`/products/${id}`, organizationId);
   }
 
   @ApiOperation({
@@ -162,10 +183,13 @@ export class ProductsController {
   @Post('upload')
   @HttpCode(HttpStatus.CREATED)
   @UseInterceptors(FileInterceptor('file'))
-  async uploadProduct(@UploadedFile() file: any) {
+  async uploadProduct(
+    @UploadedFile() file: any,
+    @Headers('x-organization-id') organizationId: string,
+  ) {
     const formData = new FormData();
     formData.append('file', file);
-    return await this.productsService.upload('/products/upload', formData);
+    return await this.productsService.upload('/products/upload', formData, organizationId);
   }
 
   @ApiOperation({
@@ -188,8 +212,12 @@ export class ProductsController {
   })
   @Post(':id/media')
   @HttpCode(HttpStatus.CREATED)
-  async addMedia(@Param('id') id: string, @Body() media: CreateProductMediaDto) {
-    return await this.productsService.post(`/products/${id}/media`, media);
+  async addMedia(
+    @Param('id') id: string,
+    @Body() media: CreateProductMediaDto,
+    @Headers('x-organization-id') organizationId: string,
+  ) {
+    return await this.productsService.post(`/products/${id}/media`, media, organizationId);
   }
 
   @ApiOperation({
@@ -221,8 +249,9 @@ export class ProductsController {
     @Param('id') id: string,
     @Param('mediaId') mediaId: string,
     @Body() media: UpdateProductMediaDto,
+    @Headers('x-organization-id') organizationId: string,
   ) {
-    return await this.productsService.put(`/products/${id}/media/${mediaId}`, media);
+    return await this.productsService.put(`/products/${id}/media/${mediaId}`, media, organizationId);
   }
 
   @ApiOperation({
@@ -254,7 +283,8 @@ export class ProductsController {
   async deleteMedia(
     @Param('id') id: string,
     @Param('mediaId') mediaId: string,
+    @Headers('x-organization-id') organizationId: string,
   ) {
-    return await this.productsService.delete(`/products/${id}/media/${mediaId}`);
+    return await this.productsService.delete(`/products/${id}/media/${mediaId}`, organizationId);
   }
 }
