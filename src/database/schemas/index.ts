@@ -5,3 +5,4 @@ export * from './customization-fields';
 export * from './carts';
 export * from './cart-changelog';
 export * from './payments';
+export * from './organizations';

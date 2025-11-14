@@ -12,7 +12,7 @@ import { InventoryModule } from './inventory/inventory.module';
 import { S3Module } from './s3/s3.module';
 import { PaymentModule } from './payments/payment.module';
 import { ConversationsService } from './conversations/conversations.service';
-// import { OrganizationModule } from './organization/organization.module';
+import { OrganizationModule } from './organization/organization.module';
 import configuration from './config/configuration';
 
 @Module({
@@ -31,7 +31,7 @@ import configuration from './config/configuration';
     InventoryModule,
     S3Module,
     PaymentModule,
-    // OrganizationModule,
+    OrganizationModule,
   ],
   controllers: [AppController],
   providers: [AppService, ConversationsService],

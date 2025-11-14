@@ -22,6 +22,13 @@
       "when": 1762795079545,
       "tag": "0002_oval_spot",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1763138283743,
+      "tag": "0003_silly_darkhawk",
+      "breakpoints": true
     }
   ]
 }
