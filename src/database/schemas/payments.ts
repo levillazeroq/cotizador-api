@@ -11,7 +11,6 @@ import {
 import { relations } from 'drizzle-orm';
 import { createInsertSchema, createSelectSchema } from 'drizzle-zod';
 import { carts } from './carts';
-import { paymentMethods } from './payment-methods';
 
 // Payment Status Enum
 export const paymentStatusEnum = pgEnum('payment_status', [
@@ -25,7 +24,7 @@ export const paymentStatusEnum = pgEnum('payment_status', [
 
 // Payment Type Enum
 export const paymentTypeEnum = pgEnum('payment_type', [
-  'web_pay',
+  'webpay',
   'bank_transfer',
   'check',
 ]);
@@ -36,19 +35,27 @@ export const payments = pgTable('payments', {
   cartId: uuid('cart_id')
     .notNull()
     .references(() => carts.id, { onDelete: 'cascade' }),
-  paymentMethodId: uuid('payment_method_id')
-    .notNull()
-    .references(() => paymentMethods.id),
   amount: decimal('amount', { precision: 10, scale: 2 }).notNull(),
   status: paymentStatusEnum('status').notNull().default('pending'),
-  paymentType: paymentTypeEnum('payment_type'),
+  paymentType: paymentTypeEnum('payment_type').notNull(),
+  
+  // Campos para pagos con comprobante (transferencia/cheque)
   proofUrl: text('proof_url'),
-  transactionId: varchar('transaction_id', { length: 255 }),
   externalReference: varchar('external_reference', { length: 255 }),
+  
+  // Campos para WebPay/Transbank
+  transactionId: varchar('transaction_id', { length: 255 }), // buyOrder de WebPay
+  authorizationCode: varchar('authorization_code', { length: 50 }), // Código de autorización
+  cardLastFourDigits: varchar('card_last_four_digits', { length: 4 }), // Últimos 4 dígitos de tarjeta
+  
+  // Fechas
   paymentDate: timestamp('payment_date'),
   confirmedAt: timestamp('confirmed_at'),
-  metadata: jsonb('metadata'),
+  
+  // Información adicional
+  metadata: jsonb('metadata'), // Para guardar toda la respuesta de WebPay u otros datos
   notes: text('notes'),
+  
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });
@@ -58,10 +65,6 @@ export const paymentsRelations = relations(payments, ({ one }) => ({
   cart: one(carts, {
     fields: [payments.cartId],
     references: [carts.id],
-  }),
-  paymentMethod: one(paymentMethods, {
-    fields: [payments.paymentMethodId],
-    references: [paymentMethods.id],
   }),
 }));
 

@@ -1,4 +1,4 @@
-import { pgTable, bigserial, bigint, boolean, timestamp, index } from 'drizzle-orm/pg-core';
+import { pgTable, bigserial, bigint, boolean, timestamp, index, varchar } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
 import { createInsertSchema, createSelectSchema } from 'drizzle-zod';
 import { organizations } from './organizations';
@@ -11,6 +11,7 @@ export const organizationPaymentMethods = pgTable(
     isCheckActive: boolean('is_check_active').notNull().default(false),
     isWebPayActive: boolean('is_web_pay_active').notNull().default(false),
     isBankTransferActive: boolean('is_bank_transfer_active').notNull().default(false),
+    webPayPrefix: varchar('web_pay_prefix', { length: 9 }).default('workit'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
@@ -43,6 +44,10 @@ export const insertOrganizationPaymentMethodSchema = createInsertSchema(organiza
   isCheckActive: (schema) => schema.default(false),
   isWebPayActive: (schema) => schema.default(false),
   isBankTransferActive: (schema) => schema.default(false),
+  webPayPrefix: (schema) => schema
+    .max(9, 'WebPay prefix must be 9 characters or less')
+    .regex(/^[a-zA-Z0-9]*$/, 'WebPay prefix must contain only letters and numbers')
+    .optional(),
 });
 
 export const selectOrganizationPaymentMethodSchema = createSelectSchema(organizationPaymentMethods);

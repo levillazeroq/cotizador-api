@@ -79,8 +79,8 @@ export class PaymentRepository {
       conditions.push(eq(payments.status, filters.status));
     }
 
-    if (filters.paymentMethodId) {
-      conditions.push(eq(payments.paymentMethodId, filters.paymentMethodId));
+    if (filters.paymentType) {
+      conditions.push(eq(payments.paymentType, filters.paymentType));
     }
 
     if (filters.cartId) {
@@ -141,11 +141,13 @@ export class PaymentRepository {
         .select({
           id: payments.id,
           cartId: payments.cartId,
-          paymentMethodId: payments.paymentMethodId,
           amount: payments.amount,
           status: payments.status,
+          paymentType: payments.paymentType,
           proofUrl: payments.proofUrl,
           transactionId: payments.transactionId,
+          authorizationCode: payments.authorizationCode,
+          cardLastFourDigits: payments.cardLastFourDigits,
           externalReference: payments.externalReference,
           paymentDate: payments.paymentDate,
           confirmedAt: payments.confirmedAt,

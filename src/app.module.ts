@@ -3,7 +3,6 @@ import { ConfigModule } from '@nestjs/config';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { DatabaseModule } from './database/database.module';
-import { PaymentMethodModule } from './payment-methods/payment-method.module';
 import { CustomizationGroupModule } from './customization-groups/customization-group.module';
 import { CustomizationFieldModule } from './customization-fields/customization-field.module';
 import { ProductsModule } from './products/products.module';
@@ -23,7 +22,6 @@ import configuration from './config/configuration';
       load: [configuration],
     }),
     DatabaseModule,
-    PaymentMethodModule, 
     CustomizationGroupModule,
     CustomizationFieldModule,
     ProductsModule,

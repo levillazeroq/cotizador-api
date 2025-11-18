@@ -27,11 +27,12 @@ export class PaymentFiltersDto {
   status?: PaymentStatus;
 
   @ApiPropertyOptional({
-    description: 'Filter by payment method ID',
+    description: 'Filter by payment type',
+    enum: ['webpay', 'bank_transfer', 'check'],
   })
   @IsOptional()
-  @IsString()
-  paymentMethodId?: string;
+  @IsEnum(['webpay', 'bank_transfer', 'check'])
+  paymentType?: 'webpay' | 'bank_transfer' | 'check';
 
   @ApiPropertyOptional({
     description: 'Filter by cart ID',

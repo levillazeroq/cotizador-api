@@ -22,11 +22,24 @@ export class PaymentService {
   ) {}
 
   async create(createPaymentDto: CreatePaymentDto): Promise<Payment> {
-    const payment = await this.paymentRepository.create({
+    // Convertir fechas de string a Date si están presentes
+    const paymentData: any = {
       ...createPaymentDto,
       amount: createPaymentDto.amount.toString(),
       status: createPaymentDto.status || 'pending',
-    });
+    };
+
+    // Convertir paymentDate si existe
+    if (createPaymentDto.paymentDate) {
+      paymentData.paymentDate = new Date(createPaymentDto.paymentDate);
+    }
+
+    // Convertir confirmedAt si existe
+    if (createPaymentDto.confirmedAt) {
+      paymentData.confirmedAt = new Date(createPaymentDto.confirmedAt);
+    }
+
+    const payment = await this.paymentRepository.create(paymentData);
 
     return payment;
   }
@@ -67,12 +80,24 @@ export class PaymentService {
   ): Promise<Payment> {
     const existingPayment = await this.findById(id);
 
-    const updatedPayment = await this.paymentRepository.update(id, {
+    // Preparar datos con conversión de fechas
+    const updateData: any = {
       ...updatePaymentDto,
       amount: updatePaymentDto.amount
         ? updatePaymentDto.amount.toString()
         : undefined,
-    });
+    };
+
+    // Convertir fechas de string a Date si están presentes
+    if (updatePaymentDto.paymentDate) {
+      updateData.paymentDate = new Date(updatePaymentDto.paymentDate);
+    }
+
+    if (updatePaymentDto.confirmedAt) {
+      updateData.confirmedAt = new Date(updatePaymentDto.confirmedAt);
+    }
+
+    const updatedPayment = await this.paymentRepository.update(id, updateData);
 
     if (!updatedPayment) {
       throw new NotFoundException(`Payment with ID ${id} not found`);
@@ -260,7 +285,7 @@ export class PaymentService {
 
     const payment = await this.paymentRepository.create({
       cartId: createProofPaymentDto.cartId,
-      paymentMethodId: createProofPaymentDto.paymentMethodId,
+      paymentType: createProofPaymentDto.paymentType,
       amount: createProofPaymentDto.amount.toString(),
       status: 'processing', // Proof-based payments start in processing status
       proofUrl: proofUrl,

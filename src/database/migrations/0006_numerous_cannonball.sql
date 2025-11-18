@@ -1,0 +1,1 @@
+ALTER TABLE "organization_payment_methods" ADD COLUMN "web_pay_prefix" varchar(10) DEFAULT 'workit';

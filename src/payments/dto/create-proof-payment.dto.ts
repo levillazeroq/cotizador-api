@@ -1,14 +1,18 @@
-import { IsUUID, IsNumber, IsString, IsOptional } from 'class-validator';
+import { IsUUID, IsNumber, IsString, IsOptional, IsEnum } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { PaymentType } from '../../database/schemas';
 
 export class CreateProofPaymentDto {
   @ApiProperty({ description: 'Cart ID' })
   @IsUUID()
   cartId: string;
 
-  @ApiProperty({ description: 'Payment Method ID (check or transfer)' })
-  @IsUUID()
-  paymentMethodId: string;
+  @ApiProperty({
+    description: 'Payment type',
+    enum: ['bank_transfer', 'check'],
+  })
+  @IsEnum(['bank_transfer', 'check'])
+  paymentType: PaymentType;
 
   @ApiProperty({ description: 'Payment amount' })
   @IsNumber()
