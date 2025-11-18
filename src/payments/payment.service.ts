@@ -13,12 +13,14 @@ import { ValidateProofDto } from './dto/validate-proof.dto';
 import { PaymentFiltersDto } from './dto/payment-filters.dto';
 import { Payment, PaymentStatus } from '../database/schemas';
 import { S3Service } from '../s3/s3.service';
+import { PdfGeneratorService } from './services/pdf-generator.service';
 
 @Injectable()
 export class PaymentService {
   constructor(
     private paymentRepository: PaymentRepository,
     private s3Service: S3Service,
+    private pdfGeneratorService: PdfGeneratorService,
   ) {}
 
   async create(createPaymentDto: CreatePaymentDto): Promise<Payment> {
@@ -361,5 +363,18 @@ export class PaymentService {
         `Cannot transition from ${currentStatus} to ${newStatus}`,
       );
     }
+  }
+
+  /**
+   * Genera un comprobante de pago en formato PDF
+   */
+  async generateReceipt(id: string): Promise<Buffer> {
+    const payment = await this.findById(id);
+
+    if (!payment) {
+      throw new NotFoundException(`Payment with ID ${id} not found`);
+    }
+
+    return await this.pdfGeneratorService.generatePaymentReceipt(payment);
   }
 }

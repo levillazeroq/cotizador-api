@@ -11,7 +11,10 @@ import {
   HttpStatus,
   UploadedFile,
   UseInterceptors,
+  Res,
+  StreamableFile,
 } from '@nestjs/common';
+import { Response } from 'express';
 import { FileInterceptor } from '@nestjs/platform-express';
 import {
   ApiTags,
@@ -71,6 +74,34 @@ export class PaymentController {
   @ApiResponse({ status: 404, description: 'Payment not found' })
   async findOne(@Param('id') id: string) {
     return await this.paymentService.findById(id);
+  }
+
+  @Get(':id/receipt')
+  @ApiOperation({ summary: 'Download payment receipt as PDF' })
+  @ApiParam({ name: 'id', description: 'Payment ID' })
+  @ApiResponse({
+    status: 200,
+    description: 'PDF receipt generated successfully',
+    content: {
+      'application/pdf': {
+        schema: {
+          type: 'string',
+          format: 'binary',
+        },
+      },
+    },
+  })
+  @ApiResponse({ status: 404, description: 'Payment not found' })
+  async downloadReceipt(@Param('id') id: string, @Res() res: Response) {
+    const pdfBuffer = await this.paymentService.generateReceipt(id);
+    
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename="comprobante-${id}.pdf"`,
+      'Content-Length': pdfBuffer.length,
+    });
+    
+    res.end(pdfBuffer);
   }
 
   @Patch(':id')
