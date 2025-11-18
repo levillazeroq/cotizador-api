@@ -29,32 +29,9 @@ async function bootstrap() {
   const config = new DocumentBuilder()
     .setTitle('Cotizador Dinámico API')
     .setDescription(
-      '# API REST para Sistema de Cotizaciones Dinámicas con IA\n\n' +
-      '## Descripción\n' +
-      'API completa para gestionar cotizaciones, productos, carritos, personalizaciones y métodos de pago. ' +
-      'Integrada con WebSockets para actualizaciones en tiempo real.\n\n' +
-      '## Características\n' +
-      '- ✅ CRUD completo para productos, carritos y cotizaciones\n' +
-      '- ✅ Sistema de personalización flexible\n' +
-      '- ✅ Gestión de inventario\n' +
-      '- ✅ Múltiples métodos de pago\n' +
-      '- ✅ WebSockets para actualizaciones en tiempo real\n' +
-      '- ✅ Validación de datos con class-validator\n\n' +
-      '## Acceso\n' +
-      '- La API se adapta automáticamente al dominio desde donde se sirve\n' +
-      '- **Documentación:** Disponible en `/docs`\n\n' +
-      '## Respuestas\n' +
-      'La API retorna respuestas en formato JSON. Los códigos de estado HTTP indican el resultado:\n' +
-      '- `2xx` - Éxito\n' +
-      '- `4xx` - Error del cliente\n' +
-      '- `5xx` - Error del servidor'
+      '# API REST para Sistema de Cotizaciones Dinámicas con IA\n\n'
     )
     .setVersion('1.0.0')
-    .setContact(
-      'Soporte API',
-      'https://github.com/yourusername/cotizador-api',
-      'support@example.com'
-    )
     .setLicense('MIT', 'https://opensource.org/licenses/MIT')
     .addTag('products', '📦 Productos - Gestión completa de catálogo de productos')
     .addTag('carts', '🛒 Carritos - Operaciones de carritos y cotizaciones')
