@@ -234,12 +234,10 @@ export class CartService {
     updateCartDto: UpdateCartSuggestionsDto,
     organizationId: string,
   ): Promise<any> {
-    console.log('updateCartSuggestions', id, updateCartDto);
     const existingCart = await this.cartRepository.findById(id);
     if (!existingCart) {
       throw new NotFoundException(`Cart with ID ${id} not found`);
     }
-
     // Clear existing items
     // await this.cartRepository.deleteCartItemsByCartId(id)
 
@@ -268,7 +266,7 @@ export class CartService {
           size: product.size || null,
           color: product.color || null,
           description: product.description || null,
-          price: product.price.amount,
+          price: product.prices[0].amount,
           quantity: Math.min(item.quantity, product.stock || item.quantity),
           imageUrl: product.media?.[0]?.url || null,
         };
