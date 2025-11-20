@@ -67,6 +67,17 @@ export class PaymentController {
     return await this.paymentService.findAllPaginated(filters);
   }
 
+  @Get('cart/:cartId')
+  @ApiOperation({ summary: 'Get payments by cart ID' })
+  @ApiParam({ name: 'cartId', description: 'Cart ID' })
+  @ApiResponse({ status: 200, description: 'Payments retrieved successfully' })
+  async findByCartId(@Param('cartId') cartId: string) {
+    const payments = await this.paymentService.findByCartId(cartId);
+    // Return the most recent completed payment, or the first payment if none completed
+    const completedPayment = payments.find(p => p.status === 'completed');
+    return completedPayment || payments[0] || null;
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get payment by ID' })
   @ApiParam({ name: 'id', description: 'Payment ID' })

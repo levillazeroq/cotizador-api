@@ -12,8 +12,8 @@ export class ProductsService {
       timeout: 10000,
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': '',
-        'X-Organization-ID': 2
+        Authorization: '',
+        'X-Organization-ID': 2,
       },
     });
 
@@ -25,7 +25,7 @@ export class ProductsService {
       (error) => {
         console.error('❌ [Products API] Request Error:', error);
         return Promise.reject(error);
-      }
+      },
     );
 
     // Response interceptor
@@ -34,71 +34,120 @@ export class ProductsService {
         return response;
       },
       (error) => {
-        console.error('❌ [Products API] Response Error:', error.response?.status, error.response?.data);
-        
+        console.error(
+          '❌ [Products API] Response Error:',
+          error.response?.status,
+          error.response?.data,
+        );
+
         if (error.response) {
           const { status, data } = error.response;
-          
+
           switch (status) {
             case 400:
-              throw new HttpException(data.error || 'Solicitud inválida', HttpStatus.BAD_REQUEST);
+              throw new HttpException(
+                data.error || 'Solicitud inválida',
+                HttpStatus.BAD_REQUEST,
+              );
             case 401:
               throw new HttpException('No autorizado', HttpStatus.UNAUTHORIZED);
             case 403:
               throw new HttpException('Acceso denegado', HttpStatus.FORBIDDEN);
             case 404:
-              throw new HttpException('Recurso no encontrado', HttpStatus.NOT_FOUND);
+              throw new HttpException(
+                'Recurso no encontrado',
+                HttpStatus.NOT_FOUND,
+              );
             case 409:
-              throw new HttpException(data.error || 'Conflicto', HttpStatus.CONFLICT);
+              throw new HttpException(
+                data.error || 'Conflicto',
+                HttpStatus.CONFLICT,
+              );
             case 422:
-              throw new HttpException(data.error || 'Datos de validación incorrectos', HttpStatus.UNPROCESSABLE_ENTITY);
+              throw new HttpException(
+                data.error || 'Datos de validación incorrectos',
+                HttpStatus.UNPROCESSABLE_ENTITY,
+              );
             case 500:
-              throw new HttpException('Error interno del servidor', HttpStatus.INTERNAL_SERVER_ERROR);
+              throw new HttpException(
+                'Error interno del servidor',
+                HttpStatus.INTERNAL_SERVER_ERROR,
+              );
             default:
-              throw new HttpException(data.error || `Error ${status}`, HttpStatus.INTERNAL_SERVER_ERROR);
+              throw new HttpException(
+                data.error || `Error ${status}`,
+                HttpStatus.INTERNAL_SERVER_ERROR,
+              );
           }
         } else if (error.request) {
-          throw new HttpException('Sin respuesta del servidor', HttpStatus.SERVICE_UNAVAILABLE);
+          throw new HttpException(
+            'Sin respuesta del servidor',
+            HttpStatus.SERVICE_UNAVAILABLE,
+          );
         } else {
-          throw new HttpException(error.message || 'Error de conexión', HttpStatus.INTERNAL_SERVER_ERROR);
+          throw new HttpException(
+            error.message || 'Error de conexión',
+            HttpStatus.INTERNAL_SERVER_ERROR,
+          );
         }
-      }
+      },
     );
   }
 
-  async getProductById(id: string): Promise<any> {
-    const response = await this.apiClient.get(`/products/${id}`, { params: { include: 'media' } });
+  async getProductById(id: string, organizationId: string): Promise<any> {
+    const response = await this.apiClient.get(`/products/${id}`, {
+      params: { include: 'media' },
+      headers: { 'X-Organization-ID': organizationId },
+    });
     return response.data;
   }
 
-  async getProducts(): Promise<any> {
-    const response = await this.apiClient.get('/products');
+  async getProducts(organizationId: string): Promise<any> {
+    const response = await this.apiClient.get('/products', {
+      headers: { 'X-Organization-ID': organizationId },
+    });
     return response.data;
   }
 
   // GET request
-  async get<T = any>(url: string, params?: any, organizationId?: string): Promise<T> {
-    const response = await this.apiClient.get(url, { 
+  async get<T = any>(
+    url: string,
+    params?: any,
+    organizationId?: string,
+  ): Promise<T> {
+    const response = await this.apiClient.get(url, {
       params,
-      headers: organizationId ? { 'X-Organization-ID': organizationId } : {}
+      headers: organizationId ? { 'X-Organization-ID': organizationId } : {},
     });
     return response.data;
   }
 
   // POST request
-  async post<T = any>(url: string, data?: any, organizationId?: string): Promise<T> {
-    const response = await this.apiClient.post(url, {...data, productType: 'simple'}, {
-      headers: organizationId ? { 'X-Organization-ID': organizationId } : {}
-    });
+  async post<T = any>(
+    url: string,
+    data?: any,
+    organizationId?: string,
+  ): Promise<T> {
+    const response = await this.apiClient.post(
+      url,
+      { ...data, productType: 'simple' },
+      {
+        headers: organizationId ? { 'X-Organization-ID': organizationId } : {},
+      },
+    );
     return response.data;
   }
 
   // PUT request
-  async put<T = any>(url: string, data?: any, organizationId?: string): Promise<T> {
+  async put<T = any>(
+    url: string,
+    data?: any,
+    organizationId?: string,
+  ): Promise<T> {
     const response = await this.apiClient.put(url, data, {
       headers: {
         'If-Match': new Date().getTime().toString(),
-        ...(organizationId ? { 'X-Organization-ID': organizationId } : {})
+        ...(organizationId ? { 'X-Organization-ID': organizationId } : {}),
       },
     });
     return response.data;
@@ -107,17 +156,21 @@ export class ProductsService {
   // DELETE request
   async delete<T = any>(url: string, organizationId?: string): Promise<T> {
     const response = await this.apiClient.delete(url, {
-      headers: organizationId ? { 'X-Organization-ID': organizationId } : {}
+      headers: organizationId ? { 'X-Organization-ID': organizationId } : {},
     });
     return response.data;
   }
 
   // Upload file
-  async upload<T = any>(url: string, formData: FormData, organizationId?: string): Promise<T> {
+  async upload<T = any>(
+    url: string,
+    formData: FormData,
+    organizationId?: string,
+  ): Promise<T> {
     const response = await this.apiClient.post(url, formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
-        ...(organizationId ? { 'X-Organization-ID': organizationId } : {})
+        ...(organizationId ? { 'X-Organization-ID': organizationId } : {}),
       },
     });
     return response.data;

@@ -10,6 +10,8 @@ import {
   HttpStatus,
   UploadedFile,
   UseInterceptors,
+  Headers,
+  BadRequestException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import {
@@ -19,6 +21,7 @@ import {
   ApiParam,
   ApiBody,
   ApiConsumes,
+  ApiHeader,
 } from '@nestjs/swagger';
 import { CartService } from './cart.service';
 import { PriceValidationService } from './services/price-validation.service';
@@ -146,6 +149,12 @@ export class CartController {
     example: 'cart_123456',
     type: String,
   })
+  @ApiHeader({
+    name: 'X-Organization-ID',
+    description: 'ID de la organización',
+    required: true,
+    example: 2,
+  })
   @ApiBody({ type: UpdateCartDto })
   @ApiResponse({ status: 200, type: CartResponseDto })
   @ApiResponse({ status: 404, type: ErrorResponseDto })
@@ -154,8 +163,13 @@ export class CartController {
   async updateCartById(
     @Param('id') id: string,
     @Body() updateCartDto: UpdateCartDto,
+    @Headers('x-organization-id') organizationId: string,
   ) {
-    const cart = await this.cartService.updateCartById(id, updateCartDto);
+    if (!organizationId) {
+      throw new BadRequestException('El header X-Organization-ID es obligatorio');
+    }
+    
+    const cart = await this.cartService.updateCartById(id, updateCartDto, organizationId);
     return {
       id: cart.id,
       items: cart.items,

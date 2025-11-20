@@ -125,6 +125,7 @@ export class CartService {
   async updateCartById(
     id: string,
     updateCartDto: UpdateCartDto,
+    organizationId: string,
   ): Promise<Cart & { items: CartItemRecord[] }> {
     const existingCart = await this.cartRepository.findById(id);
     if (!existingCart) {
@@ -134,7 +135,7 @@ export class CartService {
     if (updateCartDto.suggestions && updateCartDto.suggestions.length > 0) {
       await this.updateCartSuggestions(id, {
         suggestions: updateCartDto.suggestions,
-      });
+      }, organizationId);
     }
 
     // Add new items
@@ -143,8 +144,9 @@ export class CartService {
         // Fetch product data for changelog
         const product = await this.productsService.getProductById(
           item.productId,
+          organizationId,
         );
-
+  
         if (!product) {
           throw new NotFoundException(
             `Product with ID ${item.productId} not found`,
@@ -229,6 +231,7 @@ export class CartService {
   async updateCartSuggestions(
     id: string,
     updateCartDto: UpdateCartSuggestionsDto,
+    organizationId: string,
   ): Promise<any> {
     console.log('updateCartSuggestions', id, updateCartDto);
     const existingCart = await this.cartRepository.findById(id);
@@ -247,6 +250,7 @@ export class CartService {
         // Fetch product data for changelog
         const product = await this.productsService.getProductById(
           item.productId,
+          organizationId,
         );
 
         if (!product) {
