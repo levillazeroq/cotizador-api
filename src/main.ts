@@ -23,6 +23,7 @@ async function bootstrap() {
     maxAge: 3600, // Cache preflight request por 1 hora
   });
 
+
   // Swagger configuration - Se genera automáticamente en cada inicio
   // No especificamos servidores explícitamente para que Swagger UI
   // use automáticamente el dominio desde donde se está sirviendo
