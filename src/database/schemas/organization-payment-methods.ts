@@ -12,6 +12,7 @@ export const organizationPaymentMethods = pgTable(
     isWebPayActive: boolean('is_web_pay_active').notNull().default(false),
     isBankTransferActive: boolean('is_bank_transfer_active').notNull().default(false),
     webPayPrefix: varchar('web_pay_prefix', { length: 9 }).default('workit'),
+    webPayChildCommerceCode: varchar('web_pay_child_commerce_code', { length: 50 }).unique(),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
@@ -47,6 +48,9 @@ export const insertOrganizationPaymentMethodSchema = createInsertSchema(organiza
   webPayPrefix: (schema) => schema
     .max(9, 'WebPay prefix must be 9 characters or less')
     .regex(/^[a-zA-Z0-9]*$/, 'WebPay prefix must contain only letters and numbers')
+    .optional(),
+  webPayChildCommerceCode: (schema) => schema
+    .max(50, 'WebPay child commerce code must be 50 characters or less')
     .optional(),
 });
 

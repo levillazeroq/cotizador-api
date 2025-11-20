@@ -50,6 +50,34 @@
       "when": 1763433388161,
       "tag": "0006_numerous_cannonball",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1732147200000,
+      "tag": "0007_update_payments_schema",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1732147260000,
+      "tag": "0008_update_webpay_prefix_length",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1732147320000,
+      "tag": "0009_add_webpay_child_commerce_code",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1732147380000,
+      "tag": "0010_add_unique_constraint_webpay_child_commerce_code",
+      "breakpoints": true
     }
   ]
 }

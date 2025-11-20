@@ -35,11 +35,6 @@ import {
 } from './dto';
 
 @ApiTags('products')
-@ApiHeader({
-  name: 'X-Organization-ID',
-  description: 'ID de la organización',
-  required: true,
-})
 @Controller('products')
 export class ProductsController {
   constructor(private readonly productsService: ProductsService) {}

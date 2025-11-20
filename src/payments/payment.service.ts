@@ -72,6 +72,12 @@ export class PaymentService {
     return await this.paymentRepository.findByCartId(cartId);
   }
 
+  async findByTransactionId(transactionId: string): Promise<Payment | null> {
+    const payment =
+      await this.paymentRepository.findByTransactionId(transactionId);
+    return payment || null;
+  }
+
   async findByStatus(status: PaymentStatus): Promise<Payment[]> {
     return await this.paymentRepository.findByStatus(status);
   }

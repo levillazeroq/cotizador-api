@@ -80,6 +80,9 @@ importers:
       swagger-ui-express:
         specifier: ^5.0.1
         version: 5.0.1(express@4.21.2)
+      transbank-sdk:
+        specifier: ^6.1.0
+        version: 6.1.0
       zod:
         specifier: ^3.25.76
         version: 3.25.76
@@ -3639,6 +3642,10 @@ packages:
 
   tr46@0.0.3:
     resolution: {integrity: sha512-N3WMsuqV66lT30CrXNbEjx4GEwlow3v6rr4mCcv6prnfwhS01rkgyFdjPNBYd9br7LpXV1+Emh01fHnq2Gdgrw==}
+
+  transbank-sdk@6.1.0:
+    resolution: {integrity: sha512-tBpFRqW8MQLpBGVTQVzOHRZpmjiLECgEZgVpbLDNA6ufo9VTb4hZmS94Zelsmb9Je3jndJY8Mex7qdaTB7rLvA==}
+    engines: {node: '>=18.0.0'}
 
   tree-kill@1.2.2:
     resolution: {integrity: sha512-L0Orpi8qGpRG//Nd+H90vFB+3iHnue1zSSGmNOOCh1GLJ7rUKVwV2HvijphGQS2UmhUZewS9VgvxYIdgr+fG1A==}
@@ -8177,6 +8184,12 @@ snapshots:
       ieee754: 1.2.1
 
   tr46@0.0.3: {}
+
+  transbank-sdk@6.1.0:
+    dependencies:
+      axios: 1.12.2
+    transitivePeerDependencies:
+      - debug
 
   tree-kill@1.2.2: {}
 
