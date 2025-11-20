@@ -96,7 +96,7 @@ export class ProductsService {
 
   async getProductById(id: string, organizationId: string): Promise<any> {
     const response = await this.apiClient.get(`/products/${id}`, {
-      params: { include: 'media' },
+      params: { include: 'media,prices,inventory' },
       headers: { 'X-Organization-ID': organizationId },
     });
     return response.data;
