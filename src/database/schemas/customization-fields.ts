@@ -17,31 +17,13 @@ export const customizationFields = pgTable('customization_fields', {
   placeholder: text('placeholder'), // Texto de placeholder
   helpText: text('help_text'), // Texto de ayuda adicional
   
-  // Tipo de campo - Ampliado para soportar más tipos
+  // Tipo de campo - Simplificado a 4 tipos esenciales
   type: text('type', { 
     enum: [
-      'text',           // Texto simple
-      'textarea',       // Texto largo/multilínea
-      'number',         // Número
-      'decimal',        // Número decimal
-      'select',         // Lista desplegable
-      'multiselect',    // Selección múltiple
-      'radio',          // Botones de radio
-      'checkbox',       // Checkbox individual
-      'checkboxes',     // Múltiples checkboxes
-      'date',           // Fecha
-      'datetime',       // Fecha y hora
-      'time',           // Hora
-      'color',          // Selector de color
+      'text',           // Texto simple o multilínea
+      'number',         // Número (entero o decimal)
+      'boolean',        // Verdadero/Falso (checkbox o switch)
       'image',          // Carga de imagen
-      'file',           // Carga de archivo
-      'url',            // URL
-      'email',          // Email
-      'phone',          // Teléfono
-      'rating',         // Calificación (estrellas)
-      'slider',         // Slider/rango
-      'toggle',         // Switch on/off
-      'tags',           // Etiquetas/tags
     ] 
   }).notNull(),
   
@@ -51,8 +33,8 @@ export const customizationFields = pgTable('customization_fields', {
   sortOrder: integer('sort_order').default(0),
   defaultValue: text('default_value'), // Valor por defecto
   
-  // Opciones para select, multiselect, radio, checkboxes
-  // Formato: [{ value: "red", label: "Rojo", price: 0 }, ...]
+  // Campo options ya no es necesario con los tipos simplificados
+  // Se mantiene por compatibilidad con datos existentes
   options: jsonb('options').$type<Array<{
     value: string;
     label: string;

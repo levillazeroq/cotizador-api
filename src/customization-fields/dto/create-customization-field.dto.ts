@@ -13,30 +13,12 @@ import {
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
-// Tipos de campos soportados
+// Tipos de campos soportados - Simplificado a 4 tipos esenciales
 export enum CustomizationFieldType {
-  TEXT = 'text',
-  TEXTAREA = 'textarea',
-  NUMBER = 'number',
-  DECIMAL = 'decimal',
-  SELECT = 'select',
-  MULTISELECT = 'multiselect',
-  RADIO = 'radio',
-  CHECKBOX = 'checkbox',
-  CHECKBOXES = 'checkboxes',
-  DATE = 'date',
-  DATETIME = 'datetime',
-  TIME = 'time',
-  COLOR = 'color',
-  IMAGE = 'image',
-  FILE = 'file',
-  URL = 'url',
-  EMAIL = 'email',
-  PHONE = 'phone',
-  RATING = 'rating',
-  SLIDER = 'slider',
-  TOGGLE = 'toggle',
-  TAGS = 'tags',
+  TEXT = 'text',       // Texto simple o multilínea
+  NUMBER = 'number',   // Número (entero o decimal)
+  BOOLEAN = 'boolean', // Verdadero/Falso (checkbox o switch)
+  IMAGE = 'image',     // Carga de imagen
 }
 
 // DTO para opciones de select/radio/checkboxes

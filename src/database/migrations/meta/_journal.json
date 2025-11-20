@@ -78,6 +78,13 @@
       "when": 1732147380000,
       "tag": "0010_add_unique_constraint_webpay_child_commerce_code",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1763670752494,
+      "tag": "0011_tan_starjammers",
+      "breakpoints": true
     }
   ]
 }
