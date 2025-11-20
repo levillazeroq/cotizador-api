@@ -209,15 +209,17 @@ export class CartRepository {
     cartId,
     productId,
     quantity,
+    organizationId,
   }: {
     cartId: string;
     productId: string;
     quantity: number;
+    organizationId: string;
   }): Promise<CartItemRecord> {
     const productItem = await this.findCartItemByProductId(cartId, productId);
 
     if (!productItem) {
-      const product = await this.productsService.getProductById(productId);
+      const product = await this.productsService.getProductById(productId, organizationId);
 
       if (!product) {
         throw new NotFoundException(`Product with ID ${productId} not found`);

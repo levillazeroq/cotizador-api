@@ -158,6 +158,7 @@ export class CartService {
             cartId: id,
             productId: item.productId,
             quantity: item.quantity,
+            organizationId,
           });
 
           // Registrar en changelog
