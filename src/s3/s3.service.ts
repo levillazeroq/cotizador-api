@@ -61,6 +61,10 @@ export class S3Service {
     metadata?: Record<string, string>,
   ): Promise<UploadResult> {
     try {
+
+      if (contentType === 'image/jpeg') {
+        key = this.imagesFolder + '/' + key;
+      }
       const command = new PutObjectCommand({
         Bucket: this.bucketName,
         Key: key,
@@ -71,7 +75,7 @@ export class S3Service {
 
       await this.client.send(command);
 
-      const url = `https://${this.bucketName}.s3.${this.region}.amazonaws.com/${this.imagesFolder}/${key}`;
+      const url = `https://${this.bucketName}.s3.${this.region}.amazonaws.com/${key}`;
 
       return {
         success: true,
