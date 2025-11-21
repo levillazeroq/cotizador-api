@@ -46,5 +46,15 @@ export class CreateOrganizationPaymentMethodDto {
   @MaxLength(9, { message: 'WebPay prefix must be 9 characters or less' })
   @Matches(/^[a-zA-Z0-9]*$/, { message: 'WebPay prefix must contain only letters and numbers' })
   webPayPrefix?: string;
+
+  @ApiPropertyOptional({
+    description: 'Child commerce code for WebPay (max 50 characters). Used for multi-commerce configurations in Transbank',
+    example: '597055555532',
+    maxLength: 50,
+  })
+  @IsString()
+  @IsOptional()
+  @MaxLength(50, { message: 'WebPay child commerce code must be 50 characters or less' })
+  webPayChildCommerceCode?: string;
 }
 
