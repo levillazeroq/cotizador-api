@@ -128,6 +128,10 @@ export class UIConfigDto {
 }
 
 export class CreateCustomizationFieldDto {
+  @ApiProperty({ description: 'ID del grupo al que pertenece', example: '550e8400-e29b-41d4-a716-446655440000' })
+  @IsUUID()
+  groupId: string;
+
   @ApiProperty({ description: 'Nombre técnico único', example: 'logo_color' })
   @IsString()
   name: string;

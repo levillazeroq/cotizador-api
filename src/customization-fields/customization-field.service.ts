@@ -14,6 +14,10 @@ export class CustomizationFieldService {
     return await this.customizationFieldRepository.findAll();
   }
 
+  async findAllGrouped(): Promise<any[]> {
+    return await this.customizationFieldRepository.findAllGrouped();
+  }
+
   async findById(id: string): Promise<any> {
     const field = await this.customizationFieldRepository.findById(id);
     if (!field) {

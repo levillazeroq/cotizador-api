@@ -1,0 +1,1 @@
+ALTER TABLE "customization_fields" ALTER COLUMN "group_id" SET NOT NULL;

@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common'
-import { eq, asc, and } from 'drizzle-orm'
+import { eq, asc, and, isNull } from 'drizzle-orm'
 import { DatabaseService } from '../database/database.service'
-import { customizationFields, type CustomizationField, type NewCustomizationField } from '../database/schemas'
+import { customizationFields, customizationFieldGroups, type CustomizationField, type NewCustomizationField } from '../database/schemas'
 
 @Injectable()
 export class CustomizationFieldRepository {
@@ -12,6 +12,30 @@ export class CustomizationFieldRepository {
       .select()
       .from(customizationFields)
       .orderBy(asc(customizationFields.sortOrder), asc(customizationFields.createdAt))
+  }
+
+  async findAllGrouped(): Promise<any[]> {
+    // Obtener todos los grupos activos
+    const groups = await this.databaseService.db
+      .select()
+      .from(customizationFieldGroups)
+      .where(eq(customizationFieldGroups.isActive, true))
+      .orderBy(asc(customizationFieldGroups.sortOrder));
+
+    // Obtener todos los campos activos
+    const fields = await this.databaseService.db
+      .select()
+      .from(customizationFields)
+      .where(eq(customizationFields.isActive, true))
+      .orderBy(asc(customizationFields.sortOrder));
+
+    // Agrupar campos por grupo
+    const groupedFields = groups.map(group => ({
+      ...group,
+      fields: fields.filter(field => field.groupId === group.id)
+    }));
+
+    return groupedFields;
   }
 
   async findById(id: string): Promise<CustomizationField | null> {

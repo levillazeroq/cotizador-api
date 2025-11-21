@@ -1,5 +1,6 @@
 import { pgTable, text, boolean, integer, timestamp, uuid, jsonb, decimal } from 'drizzle-orm/pg-core';
 import { createInsertSchema, createSelectSchema } from 'drizzle-zod';
+import { relations } from 'drizzle-orm';
 
 /**
  * Customization Fields - Sistema genérico de personalización
@@ -9,6 +10,9 @@ import { createInsertSchema, createSelectSchema } from 'drizzle-zod';
  */
 export const customizationFields = pgTable('customization_fields', {
   id: uuid('id').primaryKey().defaultRandom(),
+  
+  // Relación con grupo (REQUERIDO)
+  groupId: uuid('group_id').notNull(), // Referencia al grupo (todos los campos deben estar en un grupo)
   
   // Identificación y visualización
   name: text('name').notNull().unique(), // Nombre técnico único (ej: "logo_color")
@@ -92,6 +96,14 @@ export const customizationFields = pgTable('customization_fields', {
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
 
+// Relaciones - se importa el grupo desde su archivo para evitar dependencias circulares
+export const customizationFieldsRelations = relations(customizationFields, ({ one }) => ({
+  group: one(customizationFieldGroups, {
+    fields: [customizationFields.groupId],
+    references: [customizationFieldGroups.id],
+  }),
+}));
+
 // Zod schemas para validación
 export const insertCustomizationFieldSchema = createInsertSchema(customizationFields);
 export const selectCustomizationFieldSchema = createSelectSchema(customizationFields);
@@ -99,3 +111,6 @@ export const selectCustomizationFieldSchema = createSelectSchema(customizationFi
 // Type exports
 export type CustomizationField = typeof customizationFields.$inferSelect;
 export type NewCustomizationField = typeof customizationFields.$inferInsert;
+
+// Import del grupo para relaciones
+import { customizationFieldGroups } from './customization-field-groups';

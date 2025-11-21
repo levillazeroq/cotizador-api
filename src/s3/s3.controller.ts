@@ -61,7 +61,6 @@ export class S3Controller {
     @Body('cartId') cartId?: string,
     @Body('fieldName') fieldName?: string,
   ) {
-    console.log("hola desde el controller");
     if (!file) {
       throw new BadRequestException('No file provided');
     }

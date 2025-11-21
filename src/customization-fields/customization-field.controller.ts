@@ -63,6 +63,19 @@ export class CustomizationFieldController {
     return this.customizationFieldService.findAll();
   }
 
+  @Get('grouped/all')
+  @ApiOperation({ 
+    summary: 'Obtener campos agrupados',
+    description: 'Retorna campos organizados por grupos activos'
+  })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Campos agrupados obtenidos exitosamente'
+  })
+  findAllGrouped() {
+    return this.customizationFieldService.findAllGrouped();
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Obtener campo por ID' })
   @ApiParam({ name: 'id', description: 'ID del campo' })

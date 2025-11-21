@@ -1,5 +1,6 @@
 // Export all schemas from individual files
 export * from './customization-groups';
+export * from './customization-field-groups';
 export * from './customization-fields';
 export * from './carts';
 export * from './cart-changelog';

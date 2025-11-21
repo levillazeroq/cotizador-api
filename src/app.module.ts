@@ -4,6 +4,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { DatabaseModule } from './database/database.module';
 import { CustomizationGroupModule } from './customization-groups/customization-group.module';
+import { CustomizationFieldGroupModule } from './customization-field-groups/customization-field-group.module';
 import { CustomizationFieldModule } from './customization-fields/customization-field.module';
 import { ProductsModule } from './products/products.module';
 import { CartModule } from './carts/cart.module';
@@ -23,6 +24,7 @@ import configuration from './config/configuration';
     }),
     DatabaseModule,
     CustomizationGroupModule,
+    CustomizationFieldGroupModule,
     CustomizationFieldModule,
     ProductsModule,
     CartModule,
