@@ -13,6 +13,8 @@ import { S3Module } from './s3/s3.module';
 import { PaymentModule } from './payments/payment.module';
 import { ConversationsService } from './conversations/conversations.service';
 import { OrganizationModule } from './organization/organization.module';
+import { PriceListsModule } from './price-lists/price-lists.module';
+import { PriceListConditionsModule } from './price-list-conditions/price-list-conditions.module';
 import configuration from './config/configuration';
 
 @Module({
@@ -27,6 +29,8 @@ import configuration from './config/configuration';
     CustomizationFieldGroupModule,
     CustomizationFieldModule,
     ProductsModule,
+    PriceListsModule,
+    PriceListConditionsModule,
     CartModule,
     InventoryModule,
     S3Module,

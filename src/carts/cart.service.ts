@@ -133,9 +133,13 @@ export class CartService {
     }
 
     if (updateCartDto.suggestions && updateCartDto.suggestions.length > 0) {
-      await this.updateCartSuggestions(id, {
-        suggestions: updateCartDto.suggestions,
-      }, organizationId);
+      await this.updateCartSuggestions(
+        id,
+        {
+          suggestions: updateCartDto.suggestions,
+        },
+        organizationId,
+      );
     }
 
     // Add new items
@@ -146,7 +150,7 @@ export class CartService {
           item.productId,
           organizationId,
         );
-  
+
         if (!product) {
           throw new NotFoundException(
             `Product with ID ${item.productId} not found`,
@@ -170,7 +174,7 @@ export class CartService {
             description: product.description || null,
             operation: 'add',
             quantity: item.quantity,
-            price: product.price?.amount?.toString() || null,
+            price: product.prices?.[0]?.amount?.toString() || null,
           });
         } else {
           await this.cartRepository.removeCartItemByProductId({
@@ -188,7 +192,7 @@ export class CartService {
             description: product.description || null,
             operation: 'remove',
             quantity: item.quantity,
-            price: product.price?.amount?.toString() || null,
+            price: product.prices?.[0]?.amount?.toString() || null,
           });
         }
       }
@@ -263,11 +267,15 @@ export class CartService {
           productId: item.productId,
           name: product.name,
           sku: product.sku,
-          size: product.size || null,
-          color: product.color || null,
+          // size: product.?.[0]?.name || null,
+          // color: product.color || null,
           description: product.description || null,
           price: product.prices[0].amount,
-          quantity: Math.min(item.quantity, product.stock || item.quantity),
+          // TODO: make this well
+          quantity: Math.min(
+            item.quantity,
+            product.inventory?.[0]?.available || item.quantity,
+          ),
           imageUrl: product.media?.[0]?.url || null,
         };
 

@@ -1,10 +1,10 @@
 import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import axios, { AxiosInstance } from 'axios';
-import { Product } from './products.types';
+import { PriceListCondition, PriceListConditionsResponse } from './price-list-conditions.types';
 
 @Injectable()
-export class ProductsService {
+export class PriceListConditionsService {
   private readonly apiClient: AxiosInstance;
 
   constructor(private configService: ConfigService) {
@@ -24,7 +24,7 @@ export class ProductsService {
         return config;
       },
       (error) => {
-        console.error('❌ [Products API] Request Error:', error);
+        console.error('❌ [Price List Conditions API] Request Error:', error);
         return Promise.reject(error);
       },
     );
@@ -36,7 +36,7 @@ export class ProductsService {
       },
       (error) => {
         console.error(
-          '❌ [Products API] Response Error:',
+          '❌ [Price List Conditions API] Response Error:',
           error.response?.status,
           error.response?.data,
         );
@@ -95,18 +95,29 @@ export class ProductsService {
     );
   }
 
-  async getProductById(id: string, organizationId: string): Promise<Product> {
-    const response = await this.apiClient.get(`/products/${id}`, {
-      params: { include: 'media,prices,inventory' },
+  async getConditions(
+    priceListId: string,
+    organizationId: string,
+    params?: any,
+  ): Promise<PriceListConditionsResponse> {
+    const response = await this.apiClient.get(`/price-lists/${priceListId}/conditions`, {
+      params,
       headers: { 'X-Organization-ID': organizationId },
     });
     return response.data;
   }
 
-  async getProducts(organizationId: string): Promise<Product[]> {
-    const response = await this.apiClient.get('/products', {
-      headers: { 'X-Organization-ID': organizationId },
-    });
+  async getConditionById(
+    priceListId: string,
+    conditionId: string,
+    organizationId: string,
+  ): Promise<PriceListCondition> {
+    const response = await this.apiClient.get(
+      `/price-lists/${priceListId}/conditions/${conditionId}`,
+      {
+        headers: { 'X-Organization-ID': organizationId },
+      },
+    );
     return response.data;
   }
 
@@ -117,9 +128,9 @@ export class ProductsService {
     organizationId?: string,
   ): Promise<T> {
     const response = await this.apiClient.get(url, {
-      params: { ...params, include: 'media,prices,inventory' },
+      params,
       headers: organizationId ? { 'X-Organization-ID': organizationId } : {},
-    }); 
+    });
     return response.data;
   }
 
@@ -129,13 +140,9 @@ export class ProductsService {
     data?: any,
     organizationId?: string,
   ): Promise<T> {
-    const response = await this.apiClient.post(
-      url,
-      { ...data, productType: 'simple' },
-      {
-        headers: organizationId ? { 'X-Organization-ID': organizationId } : {},
-      },
-    );
+    const response = await this.apiClient.post(url, data, {
+      headers: organizationId ? { 'X-Organization-ID': organizationId } : {},
+    });
     return response.data;
   }
 
@@ -161,19 +168,5 @@ export class ProductsService {
     });
     return response.data;
   }
-
-  // Upload file
-  async upload<T = any>(
-    url: string,
-    formData: FormData,
-    organizationId?: string,
-  ): Promise<T> {
-    const response = await this.apiClient.post(url, formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-        ...(organizationId ? { 'X-Organization-ID': organizationId } : {}),
-      },
-    });
-    return response.data;
-  }
 }
+
