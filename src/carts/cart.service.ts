@@ -242,7 +242,7 @@ export class CartService {
     if (!existingCart) {
       throw new NotFoundException(`Cart with ID ${id} not found`);
     }
-    
+
     // Clear existing items
     // await this.cartRepository.deleteCartItemsByCartId(id)
 
