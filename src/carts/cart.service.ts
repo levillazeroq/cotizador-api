@@ -158,34 +158,61 @@ export class CartService {
           existingCart,
           organizationId,
         );
-
-      this.logger.log(
-        `Applying price list "${appliedPriceList.name}" (ID: ${appliedPriceList.id}) to cart ${id}`,
-      );
-
-      // Vaciar items existentes y agregar los nuevos con precios actualizados
-      await this.cartRepository.emptyCartItemsByCartId(id);
-
+      // Actualizar o crear items manteniendo trazabilidad
       for (const item of processedItems) {
-        let newQuantity = existingCart.totalItems;
         const itemOperation = updateCartDto.items.find(
           (i) => i.productId === item.productId,
-        )?.operation;
+        )?.operation || 'add';
 
-        itemOperation === 'add' ? newQuantity += item.quantity : newQuantity -= item.quantity;
+        // Buscar si el item ya existe en el carrito
+        const existingItem = await this.cartRepository.findCartItemByProductId(
+          id,
+          item.productId,
+        );
 
-        const cartItem: NewCartItem = {
-          cartId: id,
-          productId: item.productId,
-          name: item.name,
-          sku: item.sku,
-          price: item.price,
-          quantity: newQuantity,
-          description: item.description,
-          imageUrl: item.imageUrl,
-        };
+        if (existingItem) {
+          // Item existe: actualizar cantidad según operación y precio
+          let newQuantity = existingItem.quantity;
 
-        await this.cartRepository.createCartItem(cartItem);
+          if (itemOperation === 'add') {
+            newQuantity += item.quantity;
+          } else if (itemOperation === 'remove') {
+            newQuantity -= item.quantity;
+          }
+
+          // Si la cantidad es 0 o negativa, eliminar el item
+          if (newQuantity <= 0) {
+            await this.cartRepository.deleteCartItem(existingItem.id);
+          } else {
+            // Actualizar item con nueva cantidad y precio
+            await this.cartRepository.updateCartItem(existingItem.id, {
+              quantity: newQuantity,
+              price: item.price, // Actualizar también el precio
+              name: item.name, // Actualizar nombre por si cambió
+              sku: item.sku, // Actualizar SKU por si cambió
+            });
+          }
+        } else {
+          // Item no existe: crear solo si la operación es 'add'
+          if (itemOperation === 'add') {
+            const cartItem: NewCartItem = {
+              cartId: id,
+              productId: item.productId,
+              name: item.name,
+              sku: item.sku,
+              price: item.price,
+              quantity: item.quantity,
+              description: item.description,
+              imageUrl: item.imageUrl,
+            };
+
+            await this.cartRepository.createCartItem(cartItem);
+          } else {
+            this.logger.warn(
+              `Cannot remove item ${item.productId} from cart ${id}: item does not exist`,
+            );
+          }
+        }
       }
     }
 
