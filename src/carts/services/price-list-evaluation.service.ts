@@ -10,7 +10,7 @@ export interface PriceListEvaluationContext {
 }
 
 export interface ProductPriceResult {
-  productId: string;
+  productId: number;
   priceListId: number;
   priceListName: string;
   amount: string;
@@ -18,7 +18,7 @@ export interface ProductPriceResult {
 }
 
 export interface CartItemWithPrice {
-  productId: string;
+  productId: number;
   name: string;
   sku: string;
   price: string;
@@ -41,7 +41,7 @@ export class PriceListEvaluationService {
    * @returns Array de items con precios y información de la lista de precios aplicada
    */
   async processCartItemsWithPricing(
-    items: Array<{ productId: string; quantity: number }>,
+    items: Array<{ productId: number; quantity: number }>,
     cart: Cart,
     organizationId: string,
   ): Promise<{
@@ -64,6 +64,11 @@ export class PriceListEvaluationService {
 
     // Paso 1: Obtener productos con precios de lista por defecto
     const itemsWithDefaultPrices: CartItemWithPrice[] = [];
+    const itemsIds = items.map((item) => item.productId);
+
+    // const products = await this.productsService.getProductsByIds(itemsIds, organizationId);
+
+    // console.log("products", products);
 
     for (const item of items) {
       const product = await this.productsService.getProductById(
@@ -224,7 +229,7 @@ export class PriceListEvaluationService {
    * Obtiene el precio de un producto según la lista de precios aplicable
    */
   async getProductPrice(
-    productId: string,
+    productId: number,
     priceListId: number,
     organizationId: string,
   ): Promise<{ amount: string; priceListId: number }> {
@@ -253,7 +258,7 @@ export class PriceListEvaluationService {
    * Obtiene el precio de un producto con su lista de precios aplicable
    */
   async getProductPriceWithApplicableList(
-    productId: string,
+    productId: number,
     context: PriceListEvaluationContext,
     organizationId: string,
   ): Promise<{ amount: string; priceListId: number; priceListName: string }> {

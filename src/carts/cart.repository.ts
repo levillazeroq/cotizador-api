@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { eq, desc, and, asc } from 'drizzle-orm';
 import { DatabaseService } from '../database/database.service';
 import {
@@ -11,7 +11,6 @@ import {
   type NewCartItem,
 } from '../database/schemas';
 import { ProductsService } from '../products/products.service';
-import { json } from 'stream/consumers';
 
 @Injectable()
 export class CartRepository {
@@ -213,7 +212,7 @@ export class CartRepository {
     organizationId,
   }: {
     cartId: string;
-    productId: string;
+    productId: number;
     quantity: number;
     cartItem: NewCartItem;
     organizationId: string;
@@ -250,7 +249,7 @@ export class CartRepository {
 
   async findCartItemByProductId(
     cartId: string,
-    productId: string,
+    productId: number,
   ): Promise<CartItemRecord | null> {
     const result = await this.databaseService.db
       .select()
@@ -303,7 +302,7 @@ export class CartRepository {
     quantity,
   }: {
     cartId: string;
-    productId: string;
+    productId: number;
     quantity: number;
   }): Promise<boolean> {
     // find product item by productId and cartId

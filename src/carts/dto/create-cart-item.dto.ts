@@ -8,7 +8,7 @@ export class CreateCartItemDto {
     type: String,
   })
   @IsString()
-  productId: string
+  productId: number
 
   @ApiProperty({
     description: 'Cantidad del producto a agregar al carrito',

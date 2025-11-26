@@ -6,7 +6,7 @@ import { createInsertSchema, createSelectSchema } from 'drizzle-zod'
 export const cartItems = pgTable('cart_items', {
   id: uuid('id').primaryKey().defaultRandom(),
   cartId: uuid('cart_id').notNull(),
-  productId: varchar('product_id', { length: 255 }).notNull(),
+  productId: integer('product_id').notNull(),
   name: text('name').notNull(),
   sku: varchar('sku', { length: 100 }).notNull(),
   size: varchar('size', { length: 50 }),
@@ -64,7 +64,7 @@ export const cartItemsRelations = relations(cartItems, ({ one }) => ({
 export interface CartItem {
   id: string
   cartId: string
-  productId: string
+  productId: number
   name: string
   sku: string
   size?: string

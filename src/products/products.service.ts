@@ -95,19 +95,39 @@ export class ProductsService {
     );
   }
 
-  async getProductById(id: string, organizationId: string): Promise<Product> {
+  async getProductById(
+    id: number,
+    organizationId: string,
+    params?: any,
+  ): Promise<Product> {
     const response = await this.apiClient.get(`/products/${id}`, {
-      params: { include: 'media,prices,inventory' },
+      params: { ...params, include: 'media,prices,inventory' },
       headers: { 'X-Organization-ID': organizationId },
     });
     return response.data;
   }
 
-  async getProducts(organizationId: string): Promise<Product[]> {
-    const response = await this.apiClient.get('/products', {
+  async getProducts(organizationId: string, params?: any): Promise<Product[]> {
+    const response = await this.apiClient.get<{
+      data: Product[];
+      meta: { requested: number; found: number; query_type: 'by_ids' };
+    }>('/products', {
       headers: { 'X-Organization-ID': organizationId },
+      params: { ...params },
     });
-    return response.data;
+
+    return response.data.data;
+  }
+
+  async getProductsByIds(
+    ids: number[],
+    organizationId: string,
+  ): Promise<Product[]> {
+    const productsResponse = await this.getProducts(organizationId, {
+      ids: ids.join(','),
+      include: 'media,prices,inventory',
+    });
+    return productsResponse;
   }
 
   // GET request
@@ -119,7 +139,7 @@ export class ProductsService {
     const response = await this.apiClient.get(url, {
       params: { ...params, include: 'media,prices,inventory' },
       headers: organizationId ? { 'X-Organization-ID': organizationId } : {},
-    }); 
+    });
     return response.data;
   }
 
