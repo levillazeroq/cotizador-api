@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  Logger,
 } from '@nestjs/common';
 import { CartRepository } from './cart.repository';
 import { CartChangelogRepository } from './cart-changelog.repository';
@@ -15,9 +16,13 @@ import { UpdateCartSuggestionsDto } from './dto/update-cart-suggestions.dto';
 import { PaymentService } from '../payments/payment.service';
 import { CreateProofPaymentDto } from '../payments/dto/create-proof-payment.dto';
 import { ConversationsService } from '../conversations/conversations.service';
+import { PriceListsService } from '../price-lists/price-lists.service';
+import { PriceListEvaluationService } from './services/price-list-evaluation.service';
 
 @Injectable()
 export class CartService {
+  private readonly logger = new Logger(CartService.name);
+
   constructor(
     private readonly cartRepository: CartRepository,
     private readonly cartChangelogRepository: CartChangelogRepository,
@@ -25,6 +30,8 @@ export class CartService {
     private readonly productsService: ProductsService,
     private readonly paymentService: PaymentService,
     private readonly conversationsService: ConversationsService,
+    private readonly priceListsService: PriceListsService,
+    private readonly priceListEvaluationService: PriceListEvaluationService,
   ) {}
 
   async createCart(
@@ -144,57 +151,41 @@ export class CartService {
 
     // Add new items
     if (updateCartDto.items && updateCartDto.items.length > 0) {
-      for (const item of updateCartDto.items) {
-        // Fetch product data for changelog
-        const product = await this.productsService.getProductById(
-          item.productId,
+      // Procesar items con evaluación de lista de precios
+      const { processedItems, appliedPriceList } =
+        await this.priceListEvaluationService.processCartItemsWithPricing(
+          updateCartDto.items,
+          existingCart,
           organizationId,
         );
 
-        if (!product) {
-          throw new NotFoundException(
-            `Product with ID ${item.productId} not found`,
-          );
-        }
+      this.logger.log(
+        `Applying price list "${appliedPriceList.name}" (ID: ${appliedPriceList.id}) to cart ${id}`,
+      );
 
-        if (item.operation === 'add') {
-          await this.cartRepository.addCartItemByProductId({
-            cartId: id,
-            productId: item.productId,
-            quantity: item.quantity,
-            organizationId,
-          });
+      // Vaciar items existentes y agregar los nuevos con precios actualizados
+      await this.cartRepository.emptyCartItemsByCartId(id);
 
-          // Registrar en changelog
-          await this.cartChangelogRepository.create({
-            cartId: id,
-            productId: item.productId,
-            productName: product.name,
-            sku: product.sku || null,
-            description: product.description || null,
-            operation: 'add',
-            quantity: item.quantity,
-            price: product.prices?.[0]?.amount?.toString() || null,
-          });
-        } else {
-          await this.cartRepository.removeCartItemByProductId({
-            cartId: id,
-            productId: item.productId,
-            quantity: item.quantity,
-          });
+      for (const item of processedItems) {
+        let newQuantity = existingCart.totalItems;
+        const itemOperation = updateCartDto.items.find(
+          (i) => i.productId === item.productId,
+        )?.operation;
 
-          // Registrar en changelog
-          await this.cartChangelogRepository.create({
-            cartId: id,
-            productId: item.productId,
-            productName: product.name,
-            sku: product.sku || null,
-            description: product.description || null,
-            operation: 'remove',
-            quantity: item.quantity,
-            price: product.prices?.[0]?.amount?.toString() || null,
-          });
-        }
+        itemOperation === 'add' ? newQuantity += item.quantity : newQuantity -= item.quantity;
+
+        const cartItem: NewCartItem = {
+          cartId: id,
+          productId: item.productId,
+          name: item.name,
+          sku: item.sku,
+          price: item.price,
+          quantity: newQuantity,
+          description: item.description,
+          imageUrl: item.imageUrl,
+        };
+
+        await this.cartRepository.createCartItem(cartItem);
       }
     }
 
@@ -283,8 +274,6 @@ export class CartService {
         suggestions.push(newCartItem);
       }
     }
-
-    console.log('suggestions', suggestions);
 
     this.cartGateway.emitCartSuggestions(id, suggestions);
 

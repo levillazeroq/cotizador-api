@@ -209,41 +209,33 @@ export class CartRepository {
     cartId,
     productId,
     quantity,
+    cartItem,
     organizationId,
   }: {
     cartId: string;
     productId: string;
     quantity: number;
+    cartItem: NewCartItem;
     organizationId: string;
   }): Promise<CartItemRecord> {
     const productItem = await this.findCartItemByProductId(cartId, productId);
 
     if (!productItem) {
-      const product = await this.productsService.getProductById(productId, organizationId);
-
-      if (!product) {
-        throw new NotFoundException(`Product with ID ${productId} not found`);
-      }
-
-      const productPrice = product.prices[0].amount;
-
-      const newCartItem: NewCartItem = {
-        cartId,
-        productId,
-        quantity: quantity,
-        name: product.name,
-        sku: product.sku,
-        description: product.description || null,
-        price: productPrice,
-        imageUrl: product.media?.[0]?.url || null,
-      };
-
-      return await this.createCartItem(newCartItem);
+      return await this.createCartItem(cartItem);
     }
 
     return await this.updateCartItem(productItem.id, {
       quantity: productItem.quantity + quantity,
     });
+  }
+
+  async emptyCartItemsByCartId(cartId: string): Promise<boolean> {
+    const result = await this.databaseService.db
+      .delete(cartItems)
+      .where(eq(cartItems.cartId, cartId))
+      .returning();
+
+    return result.length > 0;
   }
 
   async findCartItemById(itemId: string): Promise<CartItemRecord | null> {

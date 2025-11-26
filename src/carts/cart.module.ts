@@ -4,11 +4,12 @@ import { CartController } from './cart.controller';
 import { CartRepository } from './cart.repository';
 import { CartChangelogRepository } from './cart-changelog.repository';
 import { CartGateway } from './cart.gateway';
-import { PriceValidationService } from './services/price-validation.service';
+import { PriceListEvaluationService } from './services/price-list-evaluation.service';
 import { DatabaseModule } from '../database/database.module';
 import { ProductsModule } from '../products/products.module';
 import { PaymentModule } from '../payments/payment.module';
 import { ConversationsService } from '../conversations/conversations.service';
+import { PriceListsService } from '../price-lists/price-lists.service';
 
 @Module({
   imports: [DatabaseModule, ProductsModule, PaymentModule],
@@ -19,8 +20,9 @@ import { ConversationsService } from '../conversations/conversations.service';
     CartChangelogRepository,
     CartGateway,
     ConversationsService,
-    PriceValidationService,
+    PriceListEvaluationService,
+    PriceListsService,
   ],
-  exports: [CartService, CartGateway, PriceValidationService],
+  exports: [CartService, CartGateway, PriceListEvaluationService],
 })
 export class CartModule {}

@@ -95,9 +95,10 @@ export class PriceListsService {
     );
   }
 
-  async getPriceLists(organizationId: string): Promise<PriceListsResponse> {
+  async getPriceLists(organizationId: string, params?: any): Promise<PriceListsResponse> {
     const response = await this.apiClient.get('/price-lists', {
       headers: { 'X-Organization-ID': organizationId },
+      params: { "include_conditions": true, ...params },
     });
     return response.data;
   }
