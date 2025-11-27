@@ -70,6 +70,18 @@ export class CartController {
             properties: {
               priceListId: { type: 'number' },
               priceListName: { type: 'string' },
+              potentialSavings: { 
+                type: 'number', 
+                description: 'Ahorro potencial si se cumple esta lista de precios' 
+              },
+              currentTotal: { 
+                type: 'number', 
+                description: 'Total actual del carrito' 
+              },
+              projectedTotal: { 
+                type: 'number', 
+                description: 'Total proyectado con esta lista de precios' 
+              },
               conditions: {
                 type: 'array',
                 items: {

@@ -5,10 +5,36 @@ import {
 } from './repositories/price-list.repository';
 import { PriceListConditionRepository } from './repositories/price-list-condition.repository';
 import { TaxClassRepository } from './repositories/tax-class.repository';
+import { ProductPriceRepository } from './repositories/product-price.repository';
+import { ProductsService } from '../products/products.service';
 import { type NewPriceList } from '../database/schemas';
 
 export interface PriceListsResponse {
   priceLists: PriceListWithConditions[];
+}
+
+export interface ProductWithPrice {
+  id: number;
+  name: string;
+  sku: string;
+  description: string | null;
+  imageUrl: string | null;
+  price: {
+    id: number;
+    amount: string;
+    currency: string;
+    taxIncluded: boolean;
+    validFrom: Date | null;
+    validTo: Date | null;
+  } | null;
+}
+
+export interface PriceListProductsResponse {
+  products: ProductWithPrice[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
 }
 
 @Injectable()
@@ -17,6 +43,8 @@ export class PriceListsService {
     private readonly priceListRepository: PriceListRepository,
     private readonly priceListConditionRepository: PriceListConditionRepository,
     private readonly taxClassRepository: TaxClassRepository,
+    private readonly productPriceRepository: ProductPriceRepository,
+    private readonly productsService: ProductsService,
   ) {}
 
   async getPriceLists(
@@ -178,5 +206,105 @@ export class PriceListsService {
     if (!deleted) {
       throw new NotFoundException(`Price list with ID ${id} not found`);
     }
+  }
+
+  /**
+   * Obtiene productos con sus precios para una lista de precios específica (paginado)
+   */
+  async getPriceListProducts(
+    id: string,
+    organizationId: string,
+    page: number = 1,
+    limit: number = 20,
+    search?: string,
+  ): Promise<PriceListProductsResponse> {
+    const orgId = parseInt(organizationId, 10);
+    const priceListId = parseInt(id, 10);
+
+    // Validar parámetros de paginación
+    const pageNumber = Math.max(1, page);
+    const pageSize = Math.min(Math.max(1, limit), 100); // Máximo 100 por página
+
+    // Verificar que la lista de precios existe
+    const priceList = await this.priceListRepository.findById(
+      priceListId,
+      orgId,
+    );
+    if (!priceList) {
+      throw new NotFoundException(`Price list with ID ${id} not found`);
+    }
+
+    // Obtener precios de productos paginados para esta lista
+    const {
+      data: productPrices,
+      total,
+      totalPages,
+    } = await this.productPriceRepository.findByPriceListIdPaginated(
+      priceListId,
+      orgId,
+      pageNumber,
+      pageSize,
+      search,
+    );
+
+    if (productPrices.length === 0) {
+      return {
+        products: [],
+        total: 0,
+        page: pageNumber,
+        limit: pageSize,
+        totalPages: 0,
+      };
+    }
+
+    // Obtener los IDs de productos únicos
+    const productIds = [
+      ...new Set(productPrices.map((pp) => pp.productId)),
+    ];
+
+    // Obtener los productos del servicio (con media para imágenes)
+    const products = await this.productsService.getProductsByIds(
+      productIds,
+      organizationId,
+    );
+
+    // Crear un mapa de precios por productId para acceso rápido
+    const priceMap = new Map(
+      productPrices.map((pp) => [
+        pp.productId,
+        {
+          id: pp.id,
+          amount: pp.amount,
+          currency: pp.currency,
+          taxIncluded: pp.taxIncluded,
+          validFrom: pp.validFrom,
+          validTo: pp.validTo,
+        },
+      ]),
+    );
+
+    // Combinar productos con sus precios
+    const productsWithPrices: ProductWithPrice[] = products.map((product) => {
+      // Obtener imagen principal del producto
+      const primaryImage = product.media?.find((m) => m.is_primary) || product.media?.[0];
+      const imageUrl = primaryImage?.url || null;
+
+      return {
+        id: product.id,
+        name: product.name,
+        sku: product.sku,
+        description: product.description,
+        imageUrl,
+        price: priceMap.get(product.id) || null,
+      };
+    });
+
+    return {
+      products: productsWithPrices,
+      total,
+      page: pageNumber,
+      limit: pageSize,
+      totalPages,
+    };
   }
 }

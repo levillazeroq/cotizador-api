@@ -10,3 +10,6 @@ export * from './organization-payment-methods';
 export * from './tax-class';
 export * from './price-lists';
 export * from './price-list-conditions';
+export * from './product-prices';
+export * from './products';
+export * from './product-media';

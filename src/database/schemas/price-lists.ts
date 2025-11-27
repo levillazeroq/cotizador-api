@@ -70,7 +70,7 @@ export const priceLists = pgTable(
   },
 );
 
-// Relations
+// Relations (productPrices imported via circular dependency handling)
 export const priceListRelations = relations(priceLists, ({ one, many }) => ({
   organization: one(organizations, {
     fields: [priceLists.organizationId],
@@ -81,6 +81,7 @@ export const priceListRelations = relations(priceLists, ({ one, many }) => ({
     references: [taxClasses.id],
   }),
   conditions: many(priceListConditions),
+  // productPrices: many(productPrices), // This will be added in product-prices.ts to avoid circular deps
 }));
 
 // Zod schemas for validation

@@ -6,7 +6,7 @@ import { Cart } from '../../database/schemas';
 export interface PriceListEvaluationContext {
   totalPrice: number;
   totalQuantity: number;
-  cart: Cart;
+  cart: Cart & { items?: Array<{ productId: number; quantity: number; price?: string }> };
 }
 
 export interface ProductPriceResult {
@@ -31,6 +31,9 @@ export interface PriceListProgress {
   priceListId: number;
   priceListName: string;
   conditions: ConditionProgress[];
+  potentialSavings?: number; // Ahorro potencial si cumple todas las condiciones
+  currentTotal?: number; // Total actual del carrito
+  projectedTotal?: number; // Total proyectado con esta lista de precios
 }
 
 export interface ConditionProgress {
@@ -282,10 +285,45 @@ export class PriceListEvaluationService {
         this.logger.debug(
           `Including price list "${priceList.name}" (ID: ${priceList.id}) - not all conditions met`,
         );
+
+        // Calcular ahorro potencial con esta lista de precios
+        let potentialSavings = 0;
+        let projectedTotal = 0;
+        
+        try {
+          // Si el carrito tiene items, calcular el ahorro potencial
+          if (context.cart.items && context.cart.items.length > 0) {
+            // Calcular el total que tendría el carrito con esta lista de precios
+            for (const item of context.cart.items) {
+              const { amount } = await this.getProductPrice(
+                item.productId,
+                priceList.id,
+                organizationId,
+              );
+              projectedTotal += Number(amount) * item.quantity;
+            }
+
+            // El ahorro es la diferencia (positivo = ahorro, negativo = más caro)
+            potentialSavings = context.totalPrice - projectedTotal;
+            
+            this.logger.debug(
+              `Price list "${priceList.name}": Current total: ${context.totalPrice}, Projected total: ${projectedTotal}, Savings: ${potentialSavings}`,
+            );
+          }
+        } catch (error) {
+          this.logger.warn(
+            `Could not calculate potential savings for price list "${priceList.name}": ${error.message}`,
+          );
+          // Si no se puede calcular, continuar sin el ahorro
+        }
+
         progressList.push({
           priceListId: priceList.id,
           priceListName: priceList.name,
           conditions: conditionProgresses,
+          potentialSavings: potentialSavings > 0 ? potentialSavings : undefined,
+          currentTotal: context.totalPrice,
+          projectedTotal: projectedTotal > 0 ? projectedTotal : undefined,
         });
       } else {
         this.logger.debug(

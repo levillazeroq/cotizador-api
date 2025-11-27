@@ -17,6 +17,7 @@ import {
   ApiResponse,
   ApiParam,
   ApiHeader,
+  ApiQuery,
 } from '@nestjs/swagger';
 import { PriceListsService } from './price-lists.service';
 import { CreatePriceListDto } from './dto/create-price-list.dto';
@@ -186,6 +187,105 @@ export class PriceListsController {
     @Headers('x-organization-id') organizationId: string,
   ): Promise<void> {
     await this.priceListsService.deletePriceList(id, organizationId);
+  }
+
+  @ApiOperation({
+    summary: 'Obtener productos con precios de una lista de precios',
+    description:
+      'Retorna productos paginados que tienen precio configurado en esta lista de precios, con sus respectivos precios.',
+  })
+  @ApiParam({
+    name: 'id',
+    description: 'ID de la lista de precios',
+    example: '1',
+    type: String,
+  })
+  @ApiHeader({
+    name: 'x-organization-id',
+    description: 'ID de la organización',
+    required: true,
+  })
+  @ApiQuery({
+    name: 'page',
+    description: 'Número de página (por defecto: 1)',
+    required: false,
+    type: Number,
+    example: 1,
+  })
+  @ApiQuery({
+    name: 'limit',
+    description: 'Cantidad de productos por página (por defecto: 20, máximo: 100)',
+    required: false,
+    type: Number,
+    example: 20,
+  })
+  @ApiQuery({
+    name: 'search',
+    description: 'Buscar por SKU o nombre de producto',
+    required: false,
+    type: String,
+    example: 'laptop',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Productos con precios obtenidos exitosamente',
+    schema: {
+      type: 'object',
+      properties: {
+        products: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              id: { type: 'number' },
+              name: { type: 'string' },
+              sku: { type: 'string' },
+              description: { type: 'string', nullable: true },
+              imageUrl: { type: 'string', nullable: true },
+              price: {
+                type: 'object',
+                nullable: true,
+                properties: {
+                  id: { type: 'number' },
+                  amount: { type: 'string' },
+                  currency: { type: 'string' },
+                  taxIncluded: { type: 'boolean' },
+                  validFrom: { type: 'string', nullable: true, format: 'date-time' },
+                  validTo: { type: 'string', nullable: true, format: 'date-time' },
+                },
+              },
+            },
+          },
+        },
+        total: { type: 'number', description: 'Total de productos con precio en esta lista' },
+        page: { type: 'number', description: 'Página actual' },
+        limit: { type: 'number', description: 'Productos por página' },
+        totalPages: { type: 'number', description: 'Total de páginas' },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Lista de precios no encontrada',
+  })
+  @Get(':id/products')
+  async getPriceListProducts(
+    @Param('id') id: string,
+    @Headers('x-organization-id') organizationId: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('search') search?: string,
+  ) {
+    const pageNumber = page ? parseInt(page, 10) : 1;
+    const limitNumber = limit ? parseInt(limit, 10) : 20;
+    
+    return await this.priceListsService.getPriceListProducts(
+      id,
+      organizationId,
+      pageNumber,
+      limitNumber,
+      search,
+    );
   }
 }
 
