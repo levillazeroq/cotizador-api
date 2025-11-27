@@ -14,6 +14,7 @@ import { createInsertSchema, createSelectSchema } from 'drizzle-zod';
 import { organizations } from './organizations';
 import { productPrices } from './product-prices';
 import { productMedia } from './product-media';
+import { productRelations } from './product-relations';
 
 export const products = pgTable(
   'products',
@@ -67,13 +68,21 @@ export const products = pgTable(
 );
 
 // Relations
-export const productRelations = relations(products, ({ one, many }) => ({
+export const productRelationsSchema = relations(products, ({ one, many }) => ({
   organization: one(organizations, {
     fields: [products.organizationId],
     references: [organizations.id],
   }),
   prices: many(productPrices),
   media: many(productMedia),
+  // Relations where this product is the main product
+  relations: many(productRelations, {
+    relationName: 'product',
+  }),
+  // Relations where this product is the related product
+  relatedInRelations: many(productRelations, {
+    relationName: 'relatedProduct',
+  }),
 }));
 
 // Zod schemas for validation

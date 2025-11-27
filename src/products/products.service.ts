@@ -119,11 +119,29 @@ export class ProductsService {
   }
 
   /**
-   * Obtiene productos con filtros
+   * Obtiene productos con filtros y paginación
    */
-  async getProducts(organizationId: string, params?: any): Promise<Product[]> {
+  async getProducts(
+    organizationId: string,
+    params?: any,
+  ): Promise<{
+    data: Product[];
+    pagination: {
+      page: number;
+      limit: number;
+      total: number;
+      totalPages: number;
+    };
+  }> {
     const orgId = parseInt(organizationId, 10);
     
+    // Configurar paginación
+    const page = params?.page ? Math.max(1, parseInt(params.page, 10)) : 1;
+    const limit = params?.limit
+      ? Math.max(1, Math.min(parseInt(params.limit, 10), 100))
+      : 20;
+    const offset = (page - 1) * limit;
+
     const filters: any = {};
     
     if (params?.ids) {
@@ -149,14 +167,14 @@ export class ProductsService {
       filters.brand = params.brand;
     }
 
-    if (params?.limit) {
-      filters.limit = parseInt(params.limit, 10);
-    }
+    // Obtener total de productos (sin paginación)
+    const total = await this.productRepository.count(orgId, filters);
 
-    if (params?.offset) {
-      filters.offset = parseInt(params.offset, 10);
-    }
+    // Aplicar paginación para la consulta
+    filters.limit = limit;
+    filters.offset = offset;
 
+    // Obtener productos paginados
     const dbProducts = await this.productRepository.findMany(orgId, filters);
     
     // Verificar si se solicitan media
@@ -191,10 +209,23 @@ export class ProductsService {
       });
     }
 
-    return dbProducts.map((p) => {
+    const products = dbProducts.map((p) => {
       const media = mediaMap.get(p.id) || [];
       return this.mapToProductType(p, includeMedia, media);
     });
+
+    // Calcular total de páginas
+    const totalPages = Math.ceil(total / limit);
+
+    return {
+      data: products,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages,
+      },
+    };
   }
 
   /**

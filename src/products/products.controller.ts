@@ -53,7 +53,7 @@ export class ProductsController {
     @Query() filters: ProductFiltersDto,
     @Headers('x-organization-id') organizationId: string,
   ) {
-    return await this.productsService.get('/products', filters, organizationId);
+    return await this.productsService.getProducts(organizationId, filters);
   }
 
   @ApiOperation({

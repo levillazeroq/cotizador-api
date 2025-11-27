@@ -13,3 +13,4 @@ export * from './price-list-conditions';
 export * from './product-prices';
 export * from './products';
 export * from './product-media';
+export * from './product-relations';
