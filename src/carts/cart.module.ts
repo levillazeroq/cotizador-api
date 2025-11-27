@@ -9,10 +9,10 @@ import { DatabaseModule } from '../database/database.module';
 import { ProductsModule } from '../products/products.module';
 import { PaymentModule } from '../payments/payment.module';
 import { ConversationsService } from '../conversations/conversations.service';
-import { PriceListsService } from '../price-lists/price-lists.service';
+import { PriceListsModule } from '../price-lists/price-lists.module';
 
 @Module({
-  imports: [DatabaseModule, ProductsModule, PaymentModule],
+  imports: [DatabaseModule, ProductsModule, PaymentModule, PriceListsModule],
   controllers: [CartController],
   providers: [
     CartService,
@@ -21,7 +21,6 @@ import { PriceListsService } from '../price-lists/price-lists.service';
     CartGateway,
     ConversationsService,
     PriceListEvaluationService,
-    PriceListsService,
   ],
   exports: [CartService, CartGateway, PriceListEvaluationService],
 })

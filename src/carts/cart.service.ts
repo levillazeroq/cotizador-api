@@ -16,7 +16,6 @@ import { UpdateCartSuggestionsDto } from './dto/update-cart-suggestions.dto';
 import { PaymentService } from '../payments/payment.service';
 import { CreateProofPaymentDto } from '../payments/dto/create-proof-payment.dto';
 import { ConversationsService } from '../conversations/conversations.service';
-import { PriceListsService } from '../price-lists/price-lists.service';
 import { PriceListEvaluationService } from './services/price-list-evaluation.service';
 
 @Injectable()
@@ -30,7 +29,6 @@ export class CartService {
     private readonly productsService: ProductsService,
     private readonly paymentService: PaymentService,
     private readonly conversationsService: ConversationsService,
-    private readonly priceListsService: PriceListsService,
     private readonly priceListEvaluationService: PriceListEvaluationService,
   ) {}
 
@@ -129,6 +127,30 @@ export class CartService {
     return cart;
   }
 
+  async getPriceListProgress(id: string, organizationId: string) {
+    const cart = await this.cartRepository.findByIdWithItems(id);
+    if (!cart) {
+      throw new NotFoundException(`Cart with ID ${id} not found`);
+    }
+
+    // Calcular totales del carrito
+    const { totalItems, totalPrice } =
+      await this.cartRepository.calculateCartTotals(id);
+
+    // Obtener progreso hacia mejores listas de precios
+    const progress =
+      await this.priceListEvaluationService.calculatePriceListProgress(
+        {
+          totalPrice: Number(totalPrice),
+          totalQuantity: totalItems,
+          cart,
+        },
+        organizationId,
+      );
+
+    return progress;
+  }
+
   async updateCartById(
     id: string,
     updateCartDto: UpdateCartDto,
@@ -160,9 +182,9 @@ export class CartService {
         );
       // Actualizar o crear items manteniendo trazabilidad
       for (const item of processedItems) {
-        const itemOperation = updateCartDto.items.find(
-          (i) => i.productId === item.productId,
-        )?.operation || 'add';
+        const itemOperation =
+          updateCartDto.items.find((i) => i.productId === item.productId)
+            ?.operation || 'add';
 
         // Buscar si el item ya existe en el carrito
         const existingItem = await this.cartRepository.findCartItemByProductId(

@@ -43,6 +43,70 @@ export class CartController {
   ) {}
 
   @ApiOperation({
+    summary: 'Obtener progreso hacia mejores precios',
+    description:
+      'Muestra cuánto le falta al cliente para obtener mejores precios (tipo Amazon: "Te faltan $X para obtener envío gratis")',
+  })
+  @ApiParam({
+    name: 'id',
+    description: 'ID único del carrito',
+    example: 'cart_123456',
+    type: String,
+  })
+  @ApiHeader({
+    name: 'X-Organization-ID',
+    description: 'ID de la organización',
+    required: true,
+    example: 2,
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Progreso hacia listas de precios disponibles',
+    schema: {
+      properties: {
+        progress: {
+          type: 'array',
+          items: {
+            properties: {
+              priceListId: { type: 'number' },
+              priceListName: { type: 'string' },
+              conditions: {
+                type: 'array',
+                items: {
+                  properties: {
+                    conditionId: { type: 'number' },
+                    conditionType: { type: 'string' },
+                    isMet: { type: 'boolean' },
+                    progress: { type: 'number' },
+                    currentValue: { type: 'number' },
+                    targetValue: { type: 'number' },
+                    remaining: { type: 'number' },
+                    unit: { type: 'string' },
+                    message: { type: 'string' },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  })
+  @ApiResponse({ status: 404, type: ErrorResponseDto })
+  @Get(':id/price-list-progress')
+  async getPriceListProgress(
+    @Param('id') id: string,
+    @Headers('x-organization-id') organizationId: string,
+  ) {
+    if (!organizationId) {
+      throw new BadRequestException('El header X-Organization-ID es obligatorio');
+    }
+
+    const progress = await this.cartService.getPriceListProgress(id, organizationId);
+    return { progress };
+  }
+
+  @ApiOperation({
     summary: 'Obtener todas las cotizaciones',
     description:
       'Retorna una lista de todos los carritos (cotizaciones) con información resumida para mostrar en la interfaz de cotizaciones',

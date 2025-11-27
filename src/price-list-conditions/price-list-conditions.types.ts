@@ -11,15 +11,10 @@ export interface PriceListCondition {
   id: number;
   organizationId: number;
   priceListId: number;
-  name: string;
-  description: string | null;
-  priority: number;
   status: string;
   conditionType: string;
   operator: string;
   conditionValue: PriceListConditionValue;
-  discountType: string;
-  discountValue: number;
   config: any;
   validFrom: string | null;
   validTo: string | null;
@@ -27,7 +22,6 @@ export interface PriceListCondition {
   updatedAt: string;
   isActive: boolean;
   isValidNow: boolean;
-  hasDiscount: boolean;
 }
 
 export interface Pagination {

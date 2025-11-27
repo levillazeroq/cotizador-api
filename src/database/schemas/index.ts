@@ -7,3 +7,6 @@ export * from './cart-changelog';
 export * from './payments';
 export * from './organizations';
 export * from './organization-payment-methods';
+export * from './tax-class';
+export * from './price-lists';
+export * from './price-list-conditions';
