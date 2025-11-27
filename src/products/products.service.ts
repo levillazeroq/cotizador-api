@@ -1,14 +1,19 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { ProductRepository } from './repositories/product.repository';
 import { ProductMediaRepository } from './repositories/product-media.repository';
-import { Product, ProductMedia as ProductMediaType } from './products.types';
-import { products as productsSchema } from '../database/schemas';
+import { ProductRelationRepository } from './repositories/product-relation.repository';
+import { Product, ProductMedia as ProductMediaType, ProductWithPricesAndMedia, ProductPrice } from './products.types';
+import { products as productsSchema, productPrices } from '../database/schemas';
+import { DatabaseService } from '../database/database.service';
+import { eq, and, inArray } from 'drizzle-orm';
 
 @Injectable()
 export class ProductsService {
   constructor(
     private readonly productRepository: ProductRepository,
     private readonly productMediaRepository: ProductMediaRepository,
+    private readonly productRelationRepository: ProductRelationRepository,
+    private readonly databaseService: DatabaseService,
   ) {}
 
   /**
@@ -86,36 +91,118 @@ export class ProductsService {
     id: number,
     organizationId: string,
     params?: any,
-  ): Promise<Product> {
+  ): Promise<ProductWithPricesAndMedia> {
     const orgId = parseInt(organizationId, 10);
     const product = await this.productRepository.findById(id, orgId);
 
     if (!product) {
       throw new NotFoundException(`Product with ID ${id} not found`);
     }
+    
+    return product
+  }
 
-    // Verificar si se solicitan media
-    const includeMedia = params?.include?.includes('media');
-    let media: ProductMediaType[] = [];
+  /**
+   * Obtiene productos relacionados para un producto específico
+   */
+  async getRelatedProducts(
+    productId: number,
+    organizationId: string,
+    relationType?: string,
+    limit: number = 10,
+  ): Promise<Product[]> {
+    const orgId = parseInt(organizationId, 10);
+    
+    // Verificar que el producto existe
+    const product = await this.productRepository.findById(productId, orgId);
+    if (!product) {
+      throw new NotFoundException(`Product with ID ${productId} not found`);
+    }
 
-    if (includeMedia) {
-      const dbMedia = await this.productMediaRepository.findByProductId(
-        id,
-        orgId,
+    // Validar y convertir relationType
+    const validRelationTypes = ['related', 'upsell', 'crosssell', 'bundle_item', 'substitute', 'complement'] as const;
+    const typedRelationType = relationType && validRelationTypes.includes(relationType as any)
+      ? (relationType as typeof validRelationTypes[number])
+      : undefined;
+
+    // Obtener relaciones
+    const relations = await this.productRelationRepository.findRelatedProducts(
+      productId,
+      orgId,
+      typedRelationType,
+      limit,
+    );
+
+    if (relations.length === 0) {
+      return [];
+    }
+
+    // Obtener IDs de productos relacionados
+    const relatedProductIds = relations.map((r) => r.relatedProduct.id);
+
+    // Obtener todos los precios de los productos relacionados en una sola query
+    const allPrices = await this.databaseService.db
+      .select()
+      .from(productPrices)
+      .where(
+        and(
+          eq(productPrices.organizationId, orgId),
+          inArray(productPrices.productId, relatedProductIds),
+        ),
       );
-      media = this.mapToProductMediaType(dbMedia);
-    }
 
-    const mappedProduct = this.mapToProductType(product, includeMedia, media);
+    // Agrupar precios por productId
+    const pricesByProductId = new Map<number, typeof productPrices.$inferSelect[]>();
+    allPrices.forEach((price) => {
+      if (!pricesByProductId.has(price.productId)) {
+        pricesByProductId.set(price.productId, []);
+      }
+      pricesByProductId.get(price.productId)!.push(price);
+    });
 
-    // Si se solicitan precios, obtenerlos
-    if (params?.include?.includes('prices')) {
-      // Obtener todos los precios del producto
-      // Esto requeriría un método en ProductPriceRepository para obtener por productId
-      // Por ahora retornamos el producto sin precios
-    }
+    // Obtener todos los media de los productos relacionados
+    const allMedia = await this.productMediaRepository.findByProductIds(
+      relatedProductIds,
+      orgId,
+    );
 
-    return mappedProduct;
+    // Agrupar media por productId
+    const mediaByProductId = new Map<number, typeof allMedia>();
+    allMedia.forEach((m) => {
+      if (!mediaByProductId.has(m.productId)) {
+        mediaByProductId.set(m.productId, []);
+      }
+      mediaByProductId.get(m.productId)!.push(m);
+    });
+
+    // Mapear a formato Product con precios y media
+    return relations.map((relation) => {
+      const relatedProduct = relation.relatedProduct;
+      const productPrices = pricesByProductId.get(relatedProduct.id) || [];
+      const productMedia = mediaByProductId.get(relatedProduct.id) || [];
+
+      // Mapear precios al formato esperado
+      const mappedPrices: ProductPrice[] = productPrices.map((price) => ({
+        id: price.id,
+        price_list_id: price.priceListId,
+        currency: price.currency,
+        amount: price.amount,
+        tax_included: price.taxIncluded,
+        valid_from: price.validFrom?.toISOString() || null,
+        valid_to: price.validTo?.toISOString() || null,
+        created_at: price.createdAt.toISOString(),
+        price_list_name: '', // TODO: obtener nombre de la lista de precios si es necesario
+        price_list_is_default: false, // TODO: obtener si es default si es necesario
+      }));
+
+      // Mapear media al formato esperado
+      const mappedMedia: ProductMediaType[] = this.mapToProductMediaType(productMedia);
+
+      return {
+        ...this.mapToProductType(relatedProduct, true, mappedMedia),
+        prices: mappedPrices,
+      };
+    });
   }
 
   /**

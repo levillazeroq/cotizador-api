@@ -1,7 +1,8 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { DatabaseService } from '../../database/database.service';
-import { products, type Product, type NewProduct } from '../../database/schemas';
+import { products, type Product, type NewProduct, productPrices, productMedia, ProductPrice, ProductMedia } from '../../database/schemas';
 import { eq, and, inArray, desc, asc, sql, or, like, ilike } from 'drizzle-orm';
+import { ProductWithPricesAndMedia } from '../products.types';
 
 export interface ProductFilters {
   ids?: number[];
@@ -18,13 +19,14 @@ export class ProductRepository {
   constructor(private readonly databaseService: DatabaseService) {}
 
   /**
-   * Encuentra un producto por ID
+   * Encuentra un producto por ID con precios y media
    */
   async findById(
     id: number,
     organizationId: number,
-  ): Promise<Product | null> {
-    const result = await this.databaseService.db
+  ): Promise<ProductWithPricesAndMedia | null> {
+    // Obtener el producto base
+    const productResult = await this.databaseService.db
       .select()
       .from(products)
       .where(
@@ -32,7 +34,75 @@ export class ProductRepository {
       )
       .limit(1);
 
-    return result[0] || null;
+    if (!productResult[0]) {
+      return null;
+    }
+
+    const product = productResult[0];
+
+    // Obtener todos los precios relacionados
+    const pricesResult = await this.databaseService.db
+      .select()
+      .from(productPrices)
+      .where(
+        and(
+          eq(productPrices.productId, id),
+          eq(productPrices.organizationId, organizationId),
+        ),
+      )
+      .orderBy(productPrices.createdAt);
+
+    // Obtener todos los media relacionados
+    const mediaResult = await this.databaseService.db
+      .select()
+      .from(productMedia)
+      .where(
+        and(
+          eq(productMedia.productId, id),
+          eq(productMedia.organizationId, organizationId),
+        ),
+      )
+      .orderBy(productMedia.position, productMedia.createdAt);
+
+    // Mapear precios al formato esperado
+    const prices = pricesResult.length > 0
+      ? pricesResult.map((price) => ({
+          id: price.id,
+          price_list_id: price.priceListId,
+          currency: price.currency,
+          amount: price.amount,
+          tax_included: price.taxIncluded,
+          valid_from: price.validFrom?.toISOString() || null,
+          valid_to: price.validTo?.toISOString() || null,
+          created_at: price.createdAt.toISOString(),
+          price_list_name: '', // TODO: obtener nombre de la lista de precios si es necesario
+          price_list_is_default: false, // TODO: obtener si es default si es necesario
+        }))
+      : null;
+
+    // Mapear media al formato esperado
+    const media = mediaResult.length > 0
+      ? mediaResult.map((m) => ({
+          id: m.id,
+          type: m.type,
+          url: m.url,
+          position: m.position,
+          alt_text: m.altText,
+          title: m.title,
+          description: m.description,
+          file_size: m.fileSize,
+          mime_type: m.mimeType,
+          is_primary: m.isPrimary,
+          created_at: m.createdAt.toISOString(),
+          updated_at: m.updatedAt.toISOString(),
+        }))
+      : null;
+
+    return {
+      ...product,
+      prices,
+      media,
+    } as ProductWithPricesAndMedia;
   }
 
   /**

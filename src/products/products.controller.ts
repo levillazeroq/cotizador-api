@@ -81,7 +81,7 @@ export class ProductsController {
     @Query() query: any,
     @Headers('x-organization-id') organizationId: string,
   ) {
-    return await this.productsService.get(`/products/${id}`, query, organizationId);
+    return await this.productsService.getProductById(Number(id), organizationId, query);
   }
 
   @ApiOperation({
@@ -281,5 +281,41 @@ export class ProductsController {
     @Headers('x-organization-id') organizationId: string,
   ) {
     return await this.productsService.delete(`/products/${id}/media/${mediaId}`, organizationId);
+  }
+
+  @ApiOperation({
+    summary: 'Obtener productos relacionados',
+    description: 'Retorna productos relacionados a un producto específico. Puede filtrar por tipo de relación.',
+  })
+  @ApiParam({
+    name: 'id',
+    description: 'ID único del producto',
+    example: '4263',
+    type: String,
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Productos relacionados obtenidos exitosamente',
+    type: [ProductResponseDto],
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Producto no encontrado',
+  })
+  @Get(':id/related')
+  async getRelatedProducts(
+    @Param('id') id: string,
+    @Headers('x-organization-id') organizationId: string,
+    @Query('relationType') relationType?: string,
+    @Query('limit') limit?: string,
+  ) {
+    const productId = parseInt(id, 10);
+    const limitNum = limit ? parseInt(limit, 10) : 10;
+    return await this.productsService.getRelatedProducts(
+      productId,
+      organizationId,
+      relationType,
+      limitNum,
+    );
   }
 }

@@ -69,3 +69,7 @@ export interface Product {
   inventory?: ProductInventory[];
 }
 
+export interface ProductWithPricesAndMedia extends Product {
+  prices: ProductPrice[] | null;
+  media: ProductMedia[] | null;
+}
