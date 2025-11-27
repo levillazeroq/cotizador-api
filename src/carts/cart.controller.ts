@@ -211,12 +211,6 @@ export class CartController {
     example: 'cart_123456',
     type: String,
   })
-  @ApiHeader({
-    name: 'X-Organization-ID',
-    description: 'ID de la organización',
-    required: true,
-    example: 2,
-  })
   @ApiBody({ type: UpdateCartDto })
   @ApiResponse({ status: 200, type: CartResponseDto })
   @ApiResponse({ status: 404, type: ErrorResponseDto })
