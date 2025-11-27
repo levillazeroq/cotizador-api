@@ -136,8 +136,10 @@ export class PriceListEvaluationService {
       0,
     );
 
-    // Paso 3: Encontrar TODAS las listas de precios que cumplen condiciones
-    const applicablePriceLists = await this.findAllApplicablePriceLists(
+    // Paso 3: Encontrar la lista de precios aplicable basada en prioridad de condiciones
+    // Las listas con condiciones de tipo "amount" se ordenan por min_amount (menor a mayor)
+    // y se evalúan en ese orden. Si no cumple la primera, no se evalúa la segunda.
+    const bestPriceList = await this.findApplicablePriceListByPriority(
       {
         totalPrice,
         totalQuantity,
@@ -147,48 +149,32 @@ export class PriceListEvaluationService {
     );
 
     this.logger.log(
-      `Found ${applicablePriceLists.length} applicable price lists (including default)`,
+      `Selected price list "${bestPriceList.name}" (ID: ${bestPriceList.id})`,
     );
 
-    // Paso 4: Calcular el precio total con cada lista y elegir la de menor precio
-    let bestPriceList = defaultPriceList;
+    // Paso 4: Calcular el precio total con la lista seleccionada
     let lowestTotalPrice = totalPrice;
-
-    for (const priceList of applicablePriceLists) {
+    if (bestPriceList.id !== defaultPriceList.id) {
       let currentTotal = 0;
-
-      // Calcular el total con esta lista de precios
       for (const item of items) {
         try {
           const { amount } = await this.getProductPrice(
             item.productId,
-            priceList.id,
+            bestPriceList.id,
             organizationId,
           );
           currentTotal += Number(amount) * item.quantity;
         } catch (error) {
-          // Si no hay precio en esta lista, skip
+          // Si no hay precio en esta lista, usar la lista por defecto
           this.logger.warn(
-            `No price found for product ${item.productId} in price list ${priceList.id}`,
+            `No price found for product ${item.productId} in price list ${bestPriceList.id}, falling back to default`,
           );
-          currentTotal = Infinity; // Invalida esta lista
+          currentTotal = totalPrice;
           break;
         }
       }
-
-      // Si esta lista ofrece mejor precio, usarla
-      if (currentTotal < lowestTotalPrice) {
-        lowestTotalPrice = currentTotal;
-        bestPriceList = priceList;
-        this.logger.log(
-          `Price list "${priceList.name}" (ID: ${priceList.id}) offers better price: ${lowestTotalPrice} vs ${totalPrice}`,
-        );
-      }
+      lowestTotalPrice = currentTotal;
     }
-
-    this.logger.log(
-      `Selected price list "${bestPriceList.name}" (ID: ${bestPriceList.id}) with total price: ${lowestTotalPrice}`,
-    );
 
     // Paso 5: Actualizar precios con la mejor lista seleccionada
     if (bestPriceList.id !== defaultPriceList.id) {
@@ -322,12 +308,12 @@ export class PriceListEvaluationService {
             // Calcular el total que tendría el carrito con esta lista de precios
             for (const item of context.cart.items) {
               try {
-                const { amount } = await this.getProductPrice(
-                  item.productId,
-                  priceList.id,
-                  organizationId,
-                );
-                projectedTotal += Number(amount) * item.quantity;
+              const { amount } = await this.getProductPrice(
+                item.productId,
+                priceList.id,
+                organizationId,
+              );
+              projectedTotal += Number(amount) * item.quantity;
               } catch (error) {
                 this.logger.warn(
                   `Could not get price for product ${item.productId} in price list ${priceList.id}: ${error.message}`,
@@ -342,10 +328,10 @@ export class PriceListEvaluationService {
             // (positivo = ahorro, negativo = más caro)
             if (projectedTotal !== Infinity && defaultTotal > 0) {
               potentialSavings = defaultTotal - projectedTotal;
-              
-              this.logger.debug(
+            
+            this.logger.debug(
                 `Price list "${priceList.name}": Default total: ${defaultTotal}, Projected total: ${projectedTotal}, Savings: ${potentialSavings}`,
-              );
+            );
 
               // Actualizar mensajes de condiciones con el ahorro potencial si está disponible
               if (potentialSavings > 0) {
@@ -516,8 +502,118 @@ export class PriceListEvaluationService {
   }
 
   /**
+   * Obtiene el min_amount de una lista de precios basado en sus condiciones de tipo "amount"
+   * Retorna Infinity si no tiene condiciones de tipo "amount"
+   */
+  private getMinAmountFromPriceList(priceList: any): number {
+    if (!priceList.conditions || priceList.conditions.length === 0) {
+      return Infinity;
+    }
+
+    const amountConditions = priceList.conditions.filter(
+      (c: any) => c.status === 'active' && c.conditionType === 'amount',
+    );
+
+    if (amountConditions.length === 0) {
+      return Infinity;
+    }
+
+    // Obtener el menor min_amount de todas las condiciones de tipo amount
+    const minAmounts = amountConditions.map((condition: any) => {
+      return condition.conditionValue?.min_amount || 0;
+    });
+
+    return Math.min(...minAmounts);
+  }
+
+  /**
+   * Encuentra la lista de precios aplicable basada en prioridad de condiciones
+   * Las listas con condiciones de tipo "amount" se ordenan por min_amount (menor a mayor)
+   * y se evalúan en ese orden. Si no cumple la primera, no se evalúa la segunda.
+   */
+  async findApplicablePriceListByPriority(
+    context: PriceListEvaluationContext,
+    organizationId: string,
+  ): Promise<any> {
+    const priceLists = await this.priceListsService.getPriceLists(
+      organizationId,
+      { status: 'active' },
+    );
+
+    const defaultPriceList = priceLists.priceLists.find(
+      (priceList) => priceList.isDefault,
+    );
+
+    if (!defaultPriceList) {
+      throw new NotFoundException('Default price list not found');
+    }
+
+    // Filtrar listas de precios que tienen condiciones de tipo "amount"
+    const priceListsWithAmountConditions = priceLists.priceLists
+      .filter((pl) => !pl.isDefault && pl.status === 'active')
+      .filter((pl) => {
+        if (!pl.conditions || pl.conditions.length === 0) {
+          return false;
+        }
+        return pl.conditions.some(
+          (c: any) => c.status === 'active' && c.conditionType === 'amount',
+        );
+      });
+
+    // Ordenar por min_amount de menor a mayor
+    priceListsWithAmountConditions.sort((a, b) => {
+      const minAmountA = this.getMinAmountFromPriceList(a);
+      const minAmountB = this.getMinAmountFromPriceList(b);
+      return minAmountA - minAmountB;
+    });
+
+    this.logger.debug(
+      `Found ${priceListsWithAmountConditions.length} price lists with amount conditions, sorted by min_amount`,
+    );
+
+    // Evaluar cada lista en orden de prioridad (menor a mayor min_amount)
+    for (const priceList of priceListsWithAmountConditions) {
+      const activeConditions = priceList.conditions.filter(
+        (c: any) => c.status === 'active',
+      );
+
+      if (activeConditions.length === 0) {
+        continue;
+      }
+
+      // Verificar si TODAS las condiciones activas se cumplen
+      const allConditionsMet = activeConditions.every((condition: any) =>
+        this.evaluateCondition(
+          condition,
+          context.totalPrice,
+          context.totalQuantity,
+          context.cart,
+        ),
+      );
+
+      if (allConditionsMet) {
+        this.logger.log(
+          `Price list "${priceList.name}" (ID: ${priceList.id}) meets all conditions and will be applied`,
+        );
+        return priceList;
+      } else {
+        // Si no cumple esta lista, no evaluar las siguientes (ya están ordenadas por min_amount)
+        this.logger.debug(
+          `Price list "${priceList.name}" (ID: ${priceList.id}) does not meet conditions, stopping evaluation`,
+        );
+        break;
+      }
+    }
+
+    // Si ninguna lista cumple las condiciones, retornar la lista por defecto
+    this.logger.log('No price list meets conditions, using default price list');
+    return defaultPriceList;
+  }
+
+  /**
    * Encuentra TODAS las listas de precios aplicables según las condiciones
    * Retorna lista por defecto + todas las que cumplan sus condiciones
+   * @deprecated Use findApplicablePriceListByPriority for priority-based selection
    */
   async findAllApplicablePriceLists(
     context: PriceListEvaluationContext,
@@ -744,8 +840,8 @@ export class PriceListEvaluationService {
       // Calcular totales para evaluación
       const totalQuantity = items.reduce((sum, item) => sum + item.quantity, 0);
 
-      // Encontrar todas las listas de precios aplicables
-      const applicablePriceLists = await this.findAllApplicablePriceLists(
+      // Encontrar la lista de precios aplicable basada en prioridad
+      const bestPriceList = await this.findApplicablePriceListByPriority(
         {
           totalPrice: defaultTotal,
           totalQuantity,
@@ -754,34 +850,28 @@ export class PriceListEvaluationService {
         organizationId,
       );
 
-      // Calcular el precio total con cada lista y elegir la de menor precio
-      let bestPriceList = defaultPriceList;
+      // Calcular el precio total con la lista seleccionada
       let lowestTotalPrice = defaultTotal;
-
-      for (const priceList of applicablePriceLists) {
+      if (bestPriceList.id !== defaultPriceList.id) {
         let currentTotal = 0;
-
-        // Calcular el total con esta lista de precios
         for (const item of items) {
           try {
             const { amount } = await this.getProductPrice(
               item.productId,
-              priceList.id,
+              bestPriceList.id,
               organizationId,
             );
             currentTotal += Number(amount) * item.quantity;
           } catch (error) {
-            // Si no hay precio en esta lista, skip
-            currentTotal = Infinity;
+            // Si no hay precio en esta lista, usar la lista por defecto
+            this.logger.warn(
+              `No price found for product ${item.productId} in price list ${bestPriceList.id}, falling back to default`,
+            );
+            currentTotal = defaultTotal;
             break;
           }
         }
-
-        // Si esta lista ofrece mejor precio, usarla
-        if (currentTotal < lowestTotalPrice) {
-          lowestTotalPrice = currentTotal;
-          bestPriceList = priceList;
-        }
+        lowestTotalPrice = currentTotal;
       }
 
       // Si la lista aplicada es diferente a la por defecto, calcular ahorro

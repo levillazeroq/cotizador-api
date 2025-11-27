@@ -10,6 +10,7 @@ import {
   HttpCode,
   HttpStatus,
   Headers,
+  BadRequestException,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -144,6 +145,18 @@ export class PriceListConditionsController {
     @Body() data: any,
     @Headers('x-organization-id') organizationId: string,
   ) {
+    // Validar que solo se permiten condiciones de tipo "amount"
+    if (data.conditionType && data.conditionType !== 'amount') {
+      throw new BadRequestException(
+        'Actualmente solo se permiten condiciones de tipo "amount". Otros tipos de condiciones no están soportados.',
+      );
+    }
+
+    // Si no se especifica el tipo, establecerlo como "amount" por defecto
+    if (!data.conditionType) {
+      data.conditionType = 'amount';
+    }
+
     return await this.priceListConditionsService.post(
       `/price-lists/${priceListId}/conditions`,
       data,
@@ -187,6 +200,13 @@ export class PriceListConditionsController {
     @Body() data: any,
     @Headers('x-organization-id') organizationId: string,
   ) {
+    // Validar que solo se permiten condiciones de tipo "amount"
+    if (data.conditionType && data.conditionType !== 'amount') {
+      throw new BadRequestException(
+        'Actualmente solo se permiten condiciones de tipo "amount". Otros tipos de condiciones no están soportados.',
+      );
+    }
+
     return await this.priceListConditionsService.put(
       `/price-lists/${priceListId}/conditions/${conditionId}`,
       data,
