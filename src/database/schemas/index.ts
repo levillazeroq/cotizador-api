@@ -14,3 +14,5 @@ export * from './product-prices';
 export * from './products';
 export * from './product-media';
 export * from './product-relations';
+export * from './inventory-location';
+export * from './inventory-level';

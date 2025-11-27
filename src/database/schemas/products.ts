@@ -15,6 +15,7 @@ import { organizations } from './organizations';
 import { productPrices } from './product-prices';
 import { productMedia } from './product-media';
 import { productRelations } from './product-relations';
+import { inventoryLevels } from './inventory-level';
 
 export const products = pgTable(
   'products',
@@ -75,6 +76,7 @@ export const productRelationsSchema = relations(products, ({ one, many }) => ({
   }),
   prices: many(productPrices),
   media: many(productMedia),
+  inventory: many(inventoryLevels),
   // Relations where this product is the main product
   relations: many(productRelations, {
     relationName: 'product',

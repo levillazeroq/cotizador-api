@@ -72,4 +72,5 @@ export interface Product {
 export interface ProductWithPricesAndMedia extends Product {
   prices: ProductPrice[] | null;
   media: ProductMedia[] | null;
+  inventory?: ProductInventory[] | null;
 }

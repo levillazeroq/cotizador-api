@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { DatabaseService } from '../../database/database.service';
-import { products, type Product, type NewProduct, productPrices, productMedia, ProductPrice, ProductMedia } from '../../database/schemas';
+import { products, type Product, type NewProduct, productPrices, productMedia, inventoryLevels, inventoryLocations } from '../../database/schemas';
 import { eq, and, inArray, desc, asc, sql, or, like, ilike } from 'drizzle-orm';
 import { ProductWithPricesAndMedia } from '../products.types';
 
@@ -98,10 +98,57 @@ export class ProductRepository {
         }))
       : null;
 
+    // Obtener inventario con información de ubicación
+    const inventoryResult = await this.databaseService.db
+      .select({
+        id: inventoryLevels.id,
+        productId: inventoryLevels.productId,
+        locationId: inventoryLevels.locationId,
+        onHand: inventoryLevels.onHand,
+        reserved: inventoryLevels.reserved,
+        updatedAt: inventoryLevels.updatedAt,
+        location: inventoryLocations,
+      })
+      .from(inventoryLevels)
+      .innerJoin(
+        inventoryLocations,
+        eq(inventoryLevels.locationId, inventoryLocations.id),
+      )
+      .where(
+        and(
+          eq(inventoryLevels.productId, id),
+          eq(inventoryLevels.organizationId, organizationId),
+        ),
+      )
+      .orderBy(inventoryLevels.updatedAt);
+
+    // Mapear inventario al formato esperado
+    const inventory = inventoryResult.length > 0
+      ? inventoryResult.map((inv) => {
+          const onHand = Number(inv.onHand);
+          const reserved = Number(inv.reserved);
+          const available = onHand - reserved;
+
+          return {
+            id: inv.id,
+            product_id: inv.productId,
+            location_id: inv.locationId,
+            on_hand: inv.onHand,
+            reserved: inv.reserved,
+            updated_at: inv.updatedAt?.toISOString() || new Date().toISOString(),
+            location_code: inv.location.code,
+            location_name: inv.location.name,
+            location_type: inv.location.type,
+            available: available,
+          };
+        })
+      : null;
+
     return {
       ...product,
       prices,
       media,
+      inventory: inventory || [],
     } as ProductWithPricesAndMedia;
   }
 

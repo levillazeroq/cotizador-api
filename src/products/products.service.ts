@@ -2,8 +2,8 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { ProductRepository } from './repositories/product.repository';
 import { ProductMediaRepository } from './repositories/product-media.repository';
 import { ProductRelationRepository } from './repositories/product-relation.repository';
-import { Product, ProductMedia as ProductMediaType, ProductWithPricesAndMedia, ProductPrice } from './products.types';
-import { products as productsSchema, productPrices } from '../database/schemas';
+import { Product, ProductMedia as ProductMediaType, ProductWithPricesAndMedia, ProductPrice, ProductInventory } from './products.types';
+import { products as productsSchema, productPrices, inventoryLevels, inventoryLocations } from '../database/schemas';
 import { DatabaseService } from '../database/database.service';
 import { eq, and, inArray } from 'drizzle-orm';
 
@@ -80,7 +80,7 @@ export class ProductsService {
       metadata: dbProduct.metadata || null,
       prices: [], // Se poblará si se necesita
       media: includeMedia && media ? media : [],
-      inventory: [], // No hay tabla de inventory aún
+      inventory: [], // Se poblará si se necesita
     };
   }
 
@@ -175,11 +175,45 @@ export class ProductsService {
       mediaByProductId.get(m.productId)!.push(m);
     });
 
-    // Mapear a formato Product con precios y media
+    // Obtener inventario de todos los productos relacionados
+    const allInventory = await this.databaseService.db
+      .select({
+        id: inventoryLevels.id,
+        productId: inventoryLevels.productId,
+        locationId: inventoryLevels.locationId,
+        onHand: inventoryLevels.onHand,
+        reserved: inventoryLevels.reserved,
+        updatedAt: inventoryLevels.updatedAt,
+        location: inventoryLocations,
+      })
+      .from(inventoryLevels)
+      .innerJoin(
+        inventoryLocations,
+        eq(inventoryLevels.locationId, inventoryLocations.id),
+      )
+      .where(
+        and(
+          eq(inventoryLevels.organizationId, orgId),
+          inArray(inventoryLevels.productId, relatedProductIds),
+        ),
+      )
+      .orderBy(inventoryLevels.productId, inventoryLevels.updatedAt);
+
+    // Agrupar inventario por productId
+    const inventoryByProductId = new Map<number, typeof allInventory>();
+    allInventory.forEach((inv) => {
+      if (!inventoryByProductId.has(inv.productId)) {
+        inventoryByProductId.set(inv.productId, []);
+      }
+      inventoryByProductId.get(inv.productId)!.push(inv);
+    });
+
+    // Mapear a formato Product con precios, media e inventario
     return relations.map((relation) => {
       const relatedProduct = relation.relatedProduct;
       const productPrices = pricesByProductId.get(relatedProduct.id) || [];
       const productMedia = mediaByProductId.get(relatedProduct.id) || [];
+      const productInventory = inventoryByProductId.get(relatedProduct.id) || [];
 
       // Mapear precios al formato esperado
       const mappedPrices: ProductPrice[] = productPrices.map((price) => ({
@@ -198,9 +232,30 @@ export class ProductsService {
       // Mapear media al formato esperado
       const mappedMedia: ProductMediaType[] = this.mapToProductMediaType(productMedia);
 
+      // Mapear inventario al formato esperado
+      const mappedInventory: ProductInventory[] = productInventory.map((inv) => {
+        const onHand = Number(inv.onHand);
+        const reserved = Number(inv.reserved);
+        const available = onHand - reserved;
+
+        return {
+          id: inv.id,
+          product_id: inv.productId,
+          location_id: inv.locationId,
+          on_hand: inv.onHand,
+          reserved: inv.reserved,
+          updated_at: inv.updatedAt?.toISOString() || new Date().toISOString(),
+          location_code: inv.location.code,
+          location_name: inv.location.name,
+          location_type: inv.location.type,
+          available: available,
+        };
+      });
+
       return {
         ...this.mapToProductType(relatedProduct, true, mappedMedia),
         prices: mappedPrices,
+        inventory: mappedInventory,
       };
     });
   }
