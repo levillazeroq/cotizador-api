@@ -106,17 +106,28 @@ export class CartService {
     return await this.cartRepository.findAll();
   }
 
-  async getCartById(id: string): Promise<Cart & { items: CartItemRecord[] }> {
+  async getCartById(
+    id: string,
+    organizationId?: string,
+  ): Promise<Cart & { items: CartItemRecord[]; appliedPriceList?: any; savings?: number; defaultPriceListTotal?: number }> {
     const cart = await this.cartRepository.findByIdWithItems(id);
     if (!cart) {
       throw new NotFoundException(`Cart with ID ${id} not found`);
     }
+
+    // Si hay organizationId, calcular información de lista de precios aplicada
+    if (organizationId && cart.items && cart.items.length > 0) {
+      const pricingInfo = await this.calculateCartPricingInfo(cart, organizationId);
+      return { ...cart, ...pricingInfo };
+    }
+
     return cart;
   }
 
   async getCartByConversationId(
     conversationId: string,
-  ): Promise<Cart & { items: CartItemRecord[] }> {
+    organizationId?: string,
+  ): Promise<Cart & { items: CartItemRecord[]; appliedPriceList?: any; savings?: number; defaultPriceListTotal?: number }> {
     const cart =
       await this.cartRepository.findByConversationIdWithItems(conversationId);
     if (!cart) {
@@ -124,7 +135,43 @@ export class CartService {
         `Cart with conversation ID ${conversationId} not found`,
       );
     }
+
+    // Si hay organizationId, calcular información de lista de precios aplicada
+    if (organizationId && cart.items && cart.items.length > 0) {
+      const pricingInfo = await this.calculateCartPricingInfo(cart, organizationId);
+      return { ...cart, ...pricingInfo };
+    }
+
     return cart;
+  }
+
+  /**
+   * Calcula la información de lista de precios aplicada y ahorro para un carrito
+   */
+  private async calculateCartPricingInfo(
+    cart: Cart & { items: CartItemRecord[] },
+    organizationId: string,
+  ): Promise<{ appliedPriceList?: any; savings?: number; defaultPriceListTotal?: number }> {
+    try {
+      // Preparar items para evaluación de precios
+      const items = cart.items.map((item) => ({
+        productId: item.productId,
+        quantity: item.quantity,
+      }));
+
+      // Usar el método del servicio de evaluación de precios
+      return await this.priceListEvaluationService.calculateCartSavingsInfo(
+        items,
+        cart,
+        organizationId,
+      );
+    } catch (error) {
+      this.logger.warn(
+        `Error calculating pricing info for cart ${cart.id}: ${error.message}`,
+      );
+      // En caso de error, retornar sin información adicional
+      return {};
+    }
   }
 
   async getPriceListProgress(id: string, organizationId: string) {

@@ -161,20 +161,27 @@ export class CartController {
     type: String,
     example: 'conv_abc123xyz',
   })
+  @ApiHeader({
+    name: 'X-Organization-ID',
+    description: 'ID de la organización (opcional, necesario para calcular información de ahorro)',
+    required: false,
+    example: 2,
+  })
   @ApiResponse({ status: 200, type: CartResponseDto })
   @ApiResponse({ status: 404, type: ErrorResponseDto })
   @Get('conversation/:conversationId')
   async getCartByConversationId(
     @Param('conversationId') conversationId: string,
+    @Headers('x-organization-id') organizationId?: string,
   ) {
-    const cart = await this.cartService.getCartByConversationId(conversationId);
+    const cart = await this.cartService.getCartByConversationId(conversationId, organizationId);
     return cart;
   }
 
   @ApiOperation({
     summary: 'Obtener carrito por ID',
     description:
-      'Retorna un carrito específico con todos sus items y detalles completos',
+      'Retorna un carrito específico con todos sus items y detalles completos. Incluye información de lista de precios aplicada y ahorro si se proporciona el header X-Organization-ID.',
   })
   @ApiParam({
     name: 'id',
@@ -182,11 +189,20 @@ export class CartController {
     example: 'cart_123456',
     type: String,
   })
+  @ApiHeader({
+    name: 'X-Organization-ID',
+    description: 'ID de la organización (opcional, necesario para calcular información de ahorro)',
+    required: false,
+    example: 2,
+  })
   @ApiResponse({ status: 200, type: CartResponseDto })
   @ApiResponse({ status: 404, type: ErrorResponseDto })
   @Get(':id')
-  async getCartById(@Param('id') id: string) {
-    const cart = await this.cartService.getCartById(id);
+  async getCartById(
+    @Param('id') id: string,
+    @Headers('x-organization-id') organizationId?: string,
+  ) {
+    const cart = await this.cartService.getCartById(id, organizationId);
     return cart;
   }
 
