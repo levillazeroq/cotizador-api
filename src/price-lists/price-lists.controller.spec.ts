@@ -10,7 +10,7 @@ import {
   mockCreatePriceListDto,
   mockUpdatePriceListDto,
   mockProductPricesResponse,
-} from './__mocks__';
+} from './__mocks__/price-lists.mocks';
 
 describe('PriceListsController', () => {
   let controller: PriceListsController;

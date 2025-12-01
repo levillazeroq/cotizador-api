@@ -12,8 +12,8 @@ import {
   mockOrganizations,
   mockCreateOrganizationDto,
   mockUpdateOrganizationDto,
-  createOrganizationRepositoryMock,
-} from './__mocks__';
+} from './__mocks__/organization.mocks';
+import { createOrganizationRepositoryMock } from './__mocks__/organization-repository.mocks';
 
 describe('OrganizationService', () => {
   let service: OrganizationService;

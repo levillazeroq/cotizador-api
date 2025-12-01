@@ -19,12 +19,14 @@ import {
   mockProductPricesResponse,
   mockEmptyProductPricesResponse,
   mockProductPrice,
+} from './__mocks__/price-lists.mocks';
+import {
   createPriceListRepositoryMock,
   createPriceListConditionRepositoryMock,
   createTaxClassRepositoryMock,
   createProductPriceRepositoryMock,
-} from './__mocks__';
-import { mockProductWithPricesAndMedia } from '../products/__mocks__';
+} from './__mocks__/price-list-repository.mocks';
+import { mockProductWithPricesAndMedia } from '../products/__mocks__/product.mocks';
 
 describe('PriceListsService', () => {
   let service: PriceListsService;

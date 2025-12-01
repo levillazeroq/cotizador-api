@@ -7,7 +7,7 @@ import {
   mockPriceListConditionType,
   mockPriceListConditionsResponse,
   mockEmptyPriceListConditionsResponse,
-} from './__mocks__';
+} from './__mocks__/price-list-conditions.mocks';
 
 jest.mock('axios');
 const mockedAxios = axios as jest.Mocked<typeof axios>;

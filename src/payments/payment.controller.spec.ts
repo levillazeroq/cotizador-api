@@ -15,7 +15,7 @@ import {
   mockValidateProofDto,
   mockPaginatedPayments,
   mockGlobalStats,
-} from './__mocks__';
+} from './__mocks__/payment.mocks';
 
 describe('PaymentController', () => {
   let controller: PaymentController;

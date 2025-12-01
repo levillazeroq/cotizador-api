@@ -8,7 +8,7 @@ import {
   mockEmptyPriceListConditionsResponse,
   mockCreatePriceListConditionDto,
   mockUpdatePriceListConditionDto,
-} from './__mocks__';
+} from './__mocks__/price-list-conditions.mocks';
 
 describe('PriceListConditionsController', () => {
   let controller: PriceListConditionsController;

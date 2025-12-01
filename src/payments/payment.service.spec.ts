@@ -18,8 +18,8 @@ import {
   mockPaginatedPayments,
   mockGlobalStats,
   mockPaymentStats,
-  createPaymentRepositoryMock,
-} from './__mocks__';
+} from './__mocks__/payment.mocks';
+import { createPaymentRepositoryMock } from './__mocks__/payment-repository.mocks';
 
 describe('PaymentService', () => {
   let service: PaymentService;

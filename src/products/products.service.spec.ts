@@ -12,11 +12,13 @@ import {
   mockRelatedProduct,
   mockRelation,
   mockProductMedia,
+} from './__mocks__/product.mocks';
+import {
   createProductRepositoryMock,
   createProductMediaRepositoryMock,
   createProductRelationRepositoryMock,
-  createMockDatabaseService,
-} from './__mocks__';
+} from './__mocks__/product-repository.mocks';
+import { createMockDatabaseService } from './__mocks__/database.mocks';
 
 describe('ProductsService', () => {
   let service: ProductsService;

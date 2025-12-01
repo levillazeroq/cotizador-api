@@ -11,7 +11,7 @@ import {
   mockOrganizations,
   mockCreateOrganizationDto,
   mockUpdateOrganizationDto,
-} from './__mocks__';
+} from './__mocks__/organization.mocks';
 
 describe('OrganizationController', () => {
   let controller: OrganizationController;

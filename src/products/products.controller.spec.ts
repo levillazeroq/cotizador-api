@@ -7,7 +7,7 @@ import {
   mockProduct,
   mockProductWithPricesAndMedia,
   mockDbProducts,
-} from './__mocks__';
+} from './__mocks__/product.mocks';
 
 describe('ProductsController', () => {
   let controller: ProductsController;
