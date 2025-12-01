@@ -173,7 +173,7 @@ export class PriceListEvaluationService {
           break;
         }
       }
-      lowestTotalPrice = currentTotal;
+        lowestTotalPrice = currentTotal;
     }
 
     // Paso 5: Actualizar precios con la mejor lista seleccionada

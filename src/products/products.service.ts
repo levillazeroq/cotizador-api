@@ -5,7 +5,7 @@ import { ProductRelationRepository } from './repositories/product-relation.repos
 import { Product, ProductMedia as ProductMediaType, ProductWithPricesAndMedia, ProductPrice, ProductInventory } from './products.types';
 import { products as productsSchema, productPrices, inventoryLevels, inventoryLocations } from '../database/schemas';
 import { DatabaseService } from '../database/database.service';
-import { eq, and, inArray } from 'drizzle-orm';
+import { eq, and, inArray, sql } from 'drizzle-orm';
 
 @Injectable()
 export class ProductsService {
@@ -524,6 +524,148 @@ export class ProductsService {
     }
 
     throw new Error(`Unsupported DELETE URL: ${url}`);
+  }
+
+  /**
+   * Obtiene productos aleatorios con stock y precios
+   */
+  async getRandomProducts(
+    organizationId: string,
+    limit: number = 10,
+  ): Promise<Product[]> {
+    const orgId = parseInt(organizationId, 10);
+    
+    // Obtener productos aleatorios usando SQL RANDOM()
+    const dbProducts = await this.databaseService.db
+      .select()
+      .from(productsSchema)
+      .where(eq(productsSchema.organizationId, orgId))
+      .orderBy(sql`RANDOM()`)
+      .limit(limit);
+
+    if (dbProducts.length === 0) {
+      return [];
+    }
+
+    const productIds = dbProducts.map((p) => p.id);
+
+    // Obtener todos los precios de los productos en una sola query
+    const allPrices = await this.databaseService.db
+      .select()
+      .from(productPrices)
+      .where(
+        and(
+          eq(productPrices.organizationId, orgId),
+          inArray(productPrices.productId, productIds),
+        ),
+      );
+
+    // Agrupar precios por productId
+    const pricesByProductId = new Map<number, typeof productPrices.$inferSelect[]>();
+    allPrices.forEach((price) => {
+      if (!pricesByProductId.has(price.productId)) {
+        pricesByProductId.set(price.productId, []);
+      }
+      pricesByProductId.get(price.productId)!.push(price);
+    });
+
+    // Obtener todos los media de los productos
+    const allMedia = await this.productMediaRepository.findByProductIds(
+      productIds,
+      orgId,
+    );
+
+    // Agrupar media por productId
+    const mediaByProductId = new Map<number, typeof allMedia>();
+    allMedia.forEach((m) => {
+      if (!mediaByProductId.has(m.productId)) {
+        mediaByProductId.set(m.productId, []);
+      }
+      mediaByProductId.get(m.productId)!.push(m);
+    });
+
+    // Obtener inventario de todos los productos
+    const allInventory = await this.databaseService.db
+      .select({
+        id: inventoryLevels.id,
+        productId: inventoryLevels.productId,
+        locationId: inventoryLevels.locationId,
+        onHand: inventoryLevels.onHand,
+        reserved: inventoryLevels.reserved,
+        updatedAt: inventoryLevels.updatedAt,
+        location: inventoryLocations,
+      })
+      .from(inventoryLevels)
+      .innerJoin(
+        inventoryLocations,
+        eq(inventoryLevels.locationId, inventoryLocations.id),
+      )
+      .where(
+        and(
+          eq(inventoryLevels.organizationId, orgId),
+          inArray(inventoryLevels.productId, productIds),
+        ),
+      )
+      .orderBy(inventoryLevels.productId, inventoryLevels.updatedAt);
+
+    // Agrupar inventario por productId
+    const inventoryByProductId = new Map<number, typeof allInventory>();
+    allInventory.forEach((inv) => {
+      if (!inventoryByProductId.has(inv.productId)) {
+        inventoryByProductId.set(inv.productId, []);
+      }
+      inventoryByProductId.get(inv.productId)!.push(inv);
+    });
+
+    // Mapear a formato Product con precios, media e inventario
+    return dbProducts.map((product) => {
+      const productPrices = pricesByProductId.get(product.id) || [];
+      const productMedia = mediaByProductId.get(product.id) || [];
+      const productInventory = inventoryByProductId.get(product.id) || [];
+
+      // Mapear precios al formato esperado
+      const mappedPrices: ProductPrice[] = productPrices.map((price) => ({
+        id: price.id,
+        price_list_id: price.priceListId,
+        currency: price.currency,
+        amount: price.amount,
+        tax_included: price.taxIncluded,
+        valid_from: price.validFrom?.toISOString() || null,
+        valid_to: price.validTo?.toISOString() || null,
+        created_at: price.createdAt.toISOString(),
+        price_list_name: '', // TODO: obtener nombre de la lista de precios si es necesario
+        price_list_is_default: false, // TODO: obtener si es default si es necesario
+      }));
+
+      // Mapear media al formato esperado
+      const mappedMedia: ProductMediaType[] = this.mapToProductMediaType(productMedia);
+
+      // Mapear inventario al formato esperado
+      const mappedInventory: ProductInventory[] = productInventory.map((inv) => {
+        const onHand = Number(inv.onHand);
+        const reserved = Number(inv.reserved);
+        const available = onHand - reserved;
+
+        return {
+          id: inv.id,
+          product_id: inv.productId,
+          location_id: inv.locationId,
+          on_hand: inv.onHand,
+          reserved: inv.reserved,
+          updated_at: inv.updatedAt?.toISOString() || new Date().toISOString(),
+          location_code: inv.location.code,
+          location_name: inv.location.name,
+          location_type: inv.location.type,
+          available: available,
+        };
+      });
+
+      return {
+        ...this.mapToProductType(product, true, mappedMedia),
+        prices: mappedPrices,
+        inventory: mappedInventory,
+      };
+    });
   }
 
   /**

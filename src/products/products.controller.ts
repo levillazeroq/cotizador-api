@@ -318,4 +318,22 @@ export class ProductsController {
       limitNum,
     );
   }
+
+  @ApiOperation({
+    summary: 'Obtener productos aleatorios',
+    description: 'Retorna 10 productos aleatorios con su stock e inventario. Útil para mostrar productos destacados o sugerencias.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Productos aleatorios obtenidos exitosamente',
+    type: [ProductResponseDto],
+  })
+  @Get('random')
+  async getRandomProducts(
+    @Headers('x-organization-id') organizationId: string,
+    @Query('limit') limit?: string,
+  ) {
+    const limitNum = limit ? parseInt(limit, 10) : 10;
+    return await this.productsService.getRandomProducts(organizationId, limitNum);
+  }
 }
