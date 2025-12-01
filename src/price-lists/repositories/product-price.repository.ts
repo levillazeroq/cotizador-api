@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { DatabaseService } from '../../database/database.service';
 import { productPrices, products } from '../../database/schemas';
-import { eq, and, or, isNull, gte, lte, sql, ilike } from 'drizzle-orm';
+import { eq, and, or, isNull, gte, lte, sql, ilike, inArray } from 'drizzle-orm';
 
 export interface ProductPriceWithProduct {
   id: number;
@@ -262,6 +262,51 @@ export class ProductPriceRepository {
       );
 
     return Number(result[0]?.count || 0);
+  }
+
+  /**
+   * Obtiene precios de productos por sus IDs
+   * Retorna todos los precios activos de los productos especificados
+   */
+  async findByProductIds(
+    productIds: number[],
+    organizationId: number,
+  ): Promise<ProductPriceWithProduct[]> {
+    if (productIds.length === 0) {
+      return [];
+    }
+
+    const now = new Date();
+
+    return await this.databaseService.db
+      .select()
+      .from(productPrices)
+      .where(
+        and(
+          eq(productPrices.organizationId, organizationId),
+          inArray(productPrices.productId, productIds),
+          // Solo precios activos (considerando fechas de vigencia)
+          or(
+            and(
+              isNull(productPrices.validFrom),
+              isNull(productPrices.validTo),
+            ),
+            and(
+              isNull(productPrices.validFrom),
+              or(isNull(productPrices.validTo), gte(productPrices.validTo, now)),
+            ),
+            and(
+              or(isNull(productPrices.validFrom), lte(productPrices.validFrom, now)),
+              isNull(productPrices.validTo),
+            ),
+            and(
+              lte(productPrices.validFrom, now),
+              gte(productPrices.validTo, now),
+            ),
+          ),
+        ),
+      )
+      .orderBy(productPrices.productId, productPrices.priceListId);
   }
 }
 

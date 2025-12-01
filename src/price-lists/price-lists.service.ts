@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Inject, forwardRef } from '@nestjs/common';
 import {
   PriceListRepository,
   type PriceListWithConditions,
@@ -41,15 +41,17 @@ export interface PriceListProductsResponse {
 export class PriceListsService {
   constructor(
     private readonly priceListRepository: PriceListRepository,
-    private readonly priceListConditionRepository: PriceListConditionRepository,
-    private readonly taxClassRepository: TaxClassRepository,
+    // private readonly priceListConditionRepository: PriceListConditionRepository,
+    // private readonly taxClassRepository: TaxClassRepository,
     private readonly productPriceRepository: ProductPriceRepository,
+    @Inject(forwardRef(() => ProductsService))
     private readonly productsService: ProductsService,
   ) {}
 
   async getPriceLists(
     organizationId: string,
     options?: { status?: string },
+    ids?: number[],
   ): Promise<PriceListsResponse> {
     const orgId = parseInt(organizationId, 10);
     
@@ -306,5 +308,75 @@ export class PriceListsService {
       limit: pageSize,
       totalPages,
     };
+  }
+
+  /**
+   * Obtiene precios de productos por sus IDs
+   * Retorna todos los precios activos de los productos especificados
+   */
+  async getProductPricesByProductIds(
+    productIds: number[],
+    organizationId: string,
+  ): Promise<Array<{
+    id: number;
+    product_id: number;
+    price_list_id: number;
+    currency: string;
+    amount: string;
+    tax_included: boolean;
+    valid_from: string | null;
+    valid_to: string | null;
+    created_at: string;
+    price_list_name: string;
+    price_list_is_default: boolean;
+  }>> {
+    const orgId = parseInt(organizationId, 10);
+
+    if (productIds.length === 0) {
+      return [];
+    }
+
+    // Obtener todos los precios activos de los productos
+    const allPrices = await this.productPriceRepository.findByProductIds(
+      productIds,
+      orgId,
+    );
+
+    if (allPrices.length === 0) {
+      return [];
+    }
+
+    // Obtener información de las listas de precios para incluir nombre y si es default
+    const priceListIds = [...new Set(allPrices.map((p) => p.priceListId))];
+    const priceLists = await Promise.all(
+      priceListIds.map((id) =>
+        this.priceListRepository.findById(id, orgId),
+      ),
+    );
+
+    const priceListMap = new Map(
+      priceLists
+        .filter((pl) => pl !== null)
+        .map((pl) => [pl!.id, pl!]),
+    );
+
+    // Mapear al formato ProductPrice esperado incluyendo product_id
+    return allPrices.map((price) => {
+      const priceList = priceListMap.get(price.priceListId);
+
+      return {
+        id: price.id,
+        product_id: price.productId,
+        price_list_id: price.priceListId,
+        currency: price.currency,
+        amount: price.amount,
+        tax_included: price.taxIncluded,
+        valid_from: price.validFrom?.toISOString() || null,
+        valid_to: price.validTo?.toISOString() || null,
+        created_at: price.createdAt.toISOString(),
+        price_list_name: priceList?.name || '',
+        price_list_is_default: priceList?.isDefault || false,
+      };
+    });
   }
 }

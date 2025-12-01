@@ -1,11 +1,25 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, Inject, forwardRef } from '@nestjs/common';
 import { ProductRepository } from './repositories/product.repository';
 import { ProductMediaRepository } from './repositories/product-media.repository';
 import { ProductRelationRepository } from './repositories/product-relation.repository';
-import { Product, ProductMedia as ProductMediaType, ProductWithPricesAndMedia, ProductPrice, ProductInventory } from './products.types';
-import { products as productsSchema, productPrices, inventoryLevels, inventoryLocations } from '../database/schemas';
+import {
+  Product,
+  ProductMedia as ProductMediaType,
+  ProductWithPricesAndMedia,
+  ProductPrice,
+  ProductInventory,
+} from './products.types';
+import {
+  products as productsSchema,
+  productPrices,
+  inventoryLevels,
+  inventoryLocations,
+} from '../database/schemas';
 import { DatabaseService } from '../database/database.service';
-import { eq, and, inArray, sql } from 'drizzle-orm';
+import { eq, and, inArray, sql, or, isNull, gte, lte } from 'drizzle-orm';
+import { InventoryService } from '../inventory/inventory.service';
+import { PriceListsService } from '../price-lists/price-lists.service';
+import { ProductPriceRepository } from '../price-lists/repositories/product-price.repository';
 
 @Injectable()
 export class ProductsService {
@@ -14,6 +28,10 @@ export class ProductsService {
     private readonly productMediaRepository: ProductMediaRepository,
     private readonly productRelationRepository: ProductRelationRepository,
     private readonly databaseService: DatabaseService,
+    private readonly inventoryService: InventoryService,
+    @Inject(forwardRef(() => PriceListsService))
+    private readonly priceListService: PriceListsService,
+    private readonly productPriceRepository: ProductPriceRepository,
   ) {}
 
   /**
@@ -58,6 +76,8 @@ export class ProductsService {
     dbProduct: typeof productsSchema.$inferSelect,
     includeMedia: boolean = false,
     media?: ProductMediaType[],
+    inventory?: ProductInventory[],
+    prices?: ProductPrice[],
   ): Product {
     return {
       id: dbProduct.id,
@@ -78,9 +98,9 @@ export class ProductsService {
       width: dbProduct.width || null,
       length: dbProduct.length || null,
       metadata: dbProduct.metadata || null,
-      prices: [], // Se poblará si se necesita
+      prices: prices || [], // Se poblará si se necesita
       media: includeMedia && media ? media : [],
-      inventory: [], // Se poblará si se necesita
+      inventory: inventory || [], // Se poblará si se necesita
     };
   }
 
@@ -98,8 +118,8 @@ export class ProductsService {
     if (!product) {
       throw new NotFoundException(`Product with ID ${id} not found`);
     }
-    
-    return product
+
+    return product;
   }
 
   /**
@@ -112,7 +132,7 @@ export class ProductsService {
     limit: number = 10,
   ): Promise<Product[]> {
     const orgId = parseInt(organizationId, 10);
-    
+
     // Verificar que el producto existe
     const product = await this.productRepository.findById(productId, orgId);
     if (!product) {
@@ -120,10 +140,18 @@ export class ProductsService {
     }
 
     // Validar y convertir relationType
-    const validRelationTypes = ['related', 'upsell', 'crosssell', 'bundle_item', 'substitute', 'complement'] as const;
-    const typedRelationType = relationType && validRelationTypes.includes(relationType as any)
-      ? (relationType as typeof validRelationTypes[number])
-      : undefined;
+    const validRelationTypes = [
+      'related',
+      'upsell',
+      'crosssell',
+      'bundle_item',
+      'substitute',
+      'complement',
+    ] as const;
+    const typedRelationType =
+      relationType && validRelationTypes.includes(relationType as any)
+        ? (relationType as (typeof validRelationTypes)[number])
+        : undefined;
 
     // Obtener relaciones
     const relations = await this.productRelationRepository.findRelatedProducts(
@@ -152,7 +180,10 @@ export class ProductsService {
       );
 
     // Agrupar precios por productId
-    const pricesByProductId = new Map<number, typeof productPrices.$inferSelect[]>();
+    const pricesByProductId = new Map<
+      number,
+      (typeof productPrices.$inferSelect)[]
+    >();
     allPrices.forEach((price) => {
       if (!pricesByProductId.has(price.productId)) {
         pricesByProductId.set(price.productId, []);
@@ -175,29 +206,11 @@ export class ProductsService {
       mediaByProductId.get(m.productId)!.push(m);
     });
 
-    // Obtener inventario de todos los productos relacionados
-    const allInventory = await this.databaseService.db
-      .select({
-        id: inventoryLevels.id,
-        productId: inventoryLevels.productId,
-        locationId: inventoryLevels.locationId,
-        onHand: inventoryLevels.onHand,
-        reserved: inventoryLevels.reserved,
-        updatedAt: inventoryLevels.updatedAt,
-        location: inventoryLocations,
-      })
-      .from(inventoryLevels)
-      .innerJoin(
-        inventoryLocations,
-        eq(inventoryLevels.locationId, inventoryLocations.id),
-      )
-      .where(
-        and(
-          eq(inventoryLevels.organizationId, orgId),
-          inArray(inventoryLevels.productId, relatedProductIds),
-        ),
-      )
-      .orderBy(inventoryLevels.productId, inventoryLevels.updatedAt);
+    // Obtener inventario de todos los productos relacionados usando el servicio
+    const allInventory = await this.inventoryService.getInventoryWithLocationsByProductIds(
+      relatedProductIds,
+      orgId,
+    );
 
     // Agrupar inventario por productId
     const inventoryByProductId = new Map<number, typeof allInventory>();
@@ -213,7 +226,8 @@ export class ProductsService {
       const relatedProduct = relation.relatedProduct;
       const productPrices = pricesByProductId.get(relatedProduct.id) || [];
       const productMedia = mediaByProductId.get(relatedProduct.id) || [];
-      const productInventory = inventoryByProductId.get(relatedProduct.id) || [];
+      const productInventory =
+        inventoryByProductId.get(relatedProduct.id) || [];
 
       // Mapear precios al formato esperado
       const mappedPrices: ProductPrice[] = productPrices.map((price) => ({
@@ -230,27 +244,31 @@ export class ProductsService {
       }));
 
       // Mapear media al formato esperado
-      const mappedMedia: ProductMediaType[] = this.mapToProductMediaType(productMedia);
+      const mappedMedia: ProductMediaType[] =
+        this.mapToProductMediaType(productMedia);
 
       // Mapear inventario al formato esperado
-      const mappedInventory: ProductInventory[] = productInventory.map((inv) => {
-        const onHand = Number(inv.onHand);
-        const reserved = Number(inv.reserved);
-        const available = onHand - reserved;
+      const mappedInventory: ProductInventory[] = productInventory.map(
+        (inv) => {
+          const onHand = Number(inv.onHand);
+          const reserved = Number(inv.reserved);
+          const available = onHand - reserved;
 
-        return {
-          id: inv.id,
-          product_id: inv.productId,
-          location_id: inv.locationId,
-          on_hand: inv.onHand,
-          reserved: inv.reserved,
-          updated_at: inv.updatedAt?.toISOString() || new Date().toISOString(),
-          location_code: inv.location.code,
-          location_name: inv.location.name,
-          location_type: inv.location.type,
-          available: available,
-        };
-      });
+          return {
+            id: inv.id,
+            product_id: inv.productId,
+            location_id: inv.locationId,
+            on_hand: inv.onHand,
+            reserved: inv.reserved,
+            updated_at:
+              inv.updatedAt?.toISOString() || new Date().toISOString(),
+            location_code: '',
+            location_name: '',
+            location_type: '',
+            available: available,
+          };
+        },
+      );
 
       return {
         ...this.mapToProductType(relatedProduct, true, mappedMedia),
@@ -276,7 +294,7 @@ export class ProductsService {
     };
   }> {
     const orgId = parseInt(organizationId, 10);
-    
+
     // Configurar paginación
     const page = params?.page ? Math.max(1, parseInt(params.page, 10)) : 1;
     const limit = params?.limit
@@ -285,9 +303,9 @@ export class ProductsService {
     const offset = (page - 1) * limit;
 
     const filters: any = {};
-    
+
     if (params?.ids) {
-      const ids = Array.isArray(params.ids) 
+      const ids = Array.isArray(params.ids)
         ? params.ids.map((id: string) => parseInt(id, 10))
         : params.ids.split(',').map((id: string) => parseInt(id.trim(), 10));
       filters.ids = ids;
@@ -318,18 +336,18 @@ export class ProductsService {
 
     // Obtener productos paginados
     const dbProducts = await this.productRepository.findMany(orgId, filters);
-    
+
     // Verificar si se solicitan media
     const includeMedia = params?.include?.includes('media');
     let mediaMap: Map<number, ProductMediaType[]> = new Map();
 
+    const productIds = dbProducts.map((p) => p.id);
     if (includeMedia && dbProducts.length > 0) {
-      const productIds = dbProducts.map((p) => p.id);
       const allMedia = await this.productMediaRepository.findByProductIds(
         productIds,
         orgId,
       );
-      
+
       // Agrupar media por productId
       allMedia.forEach((m) => {
         const mediaArray = mediaMap.get(m.productId) || [];
@@ -351,9 +369,76 @@ export class ProductsService {
       });
     }
 
+    // verificar si pide inventario
+    const inventoryMap: Map<number, any[]> = new Map();
+    const includeInventory = params?.include?.includes('inventory');
+    if (includeInventory) {
+      const allInventory = await this.inventoryService.getInventoryByProductIds(productIds);
+
+      allInventory.forEach((inv) => {
+        const inventoryArray = inventoryMap.get(inv.productId) || [];
+        inventoryArray.push(inv);
+        inventoryMap.set(inv.productId, inventoryArray);
+      });
+    }
+
+    // verificar si pide precios
+    const priceMap: Map<number, ProductPrice[]> = new Map();
+    const includePrices = params?.include?.includes('prices');
+    if (includePrices && productIds.length > 0) {
+      // Obtener precios usando el servicio de listas de precios
+      const allPrices = await this.priceListService.getProductPricesByProductIds(
+        productIds,
+        organizationId,
+      );
+
+      // Necesitamos obtener el productId de cada precio
+      // El método del servicio retorna precios pero necesitamos mapearlos por productId
+      // Por eso obtenemos los precios del repositorio que incluye productId
+      const pricesWithProductId = await this.productPriceRepository.findByProductIds(
+        productIds,
+        orgId,
+      );
+
+      // Crear un mapa de precios del servicio por price_list_id para obtener info adicional
+      const servicePriceMap = new Map(
+        allPrices.map((p) => [p.price_list_id, p]),
+      );
+
+      // Agrupar precios por productId
+      pricesWithProductId.forEach((price) => {
+        const priceArray = priceMap.get(price.productId) || [];
+        const servicePrice = servicePriceMap.get(price.priceListId);
+        
+        priceArray.push({
+          id: price.id,
+          price_list_id: price.priceListId,
+          currency: price.currency,
+          amount: price.amount,
+          tax_included: price.taxIncluded,
+          valid_from: price.validFrom?.toISOString() || null,
+          valid_to: price.validTo?.toISOString() || null,
+          created_at: price.createdAt.toISOString(),
+          price_list_name: servicePrice?.price_list_name || '',
+          price_list_is_default: servicePrice?.price_list_is_default || false,
+        });
+        priceMap.set(price.productId, priceArray);
+      });
+    }
+
+
+
     const products = dbProducts.map((p) => {
       const media = mediaMap.get(p.id) || [];
-      return this.mapToProductType(p, includeMedia, media);
+      const inventory = inventoryMap.get(p.id) || [];
+      const prices = priceMap.get(p.id) || [];
+      
+      const product = this.mapToProductType(p, includeMedia, media, inventory);
+      if (includePrices) {
+        product.prices = prices;
+      }
+      
+      return product;
     });
 
     // Calcular total de páginas
@@ -379,7 +464,7 @@ export class ProductsService {
   ): Promise<Product[]> {
     const orgId = parseInt(organizationId, 10);
     const dbProducts = await this.productRepository.findByIds(ids, orgId);
-    
+
     // Obtener media para todos los productos
     let mediaMap: Map<number, ProductMediaType[]> = new Map();
     if (dbProducts.length > 0) {
@@ -387,7 +472,7 @@ export class ProductsService {
         ids,
         orgId,
       );
-      
+
       // Agrupar media por productId
       allMedia.forEach((m) => {
         const mediaArray = mediaMap.get(m.productId) || [];
@@ -413,30 +498,6 @@ export class ProductsService {
       const media = mediaMap.get(p.id) || [];
       return this.mapToProductType(p, true, media);
     });
-  }
-
-  /**
-   * GET request - Mantenido por compatibilidad con código existente
-   * @deprecated Usar métodos específicos en su lugar
-   */
-  async get<T = any>(
-    url: string,
-    params?: any,
-    organizationId?: string,
-  ): Promise<T> {
-    // Si es /products, usar getProducts
-    if (url === '/products' || url === 'products') {
-      return (await this.getProducts(organizationId || '', params)) as T;
-    }
-    
-    // Si es /products/:id, extraer el ID y usar getProductById
-    const match = url.match(/\/products\/(\d+)/);
-    if (match) {
-      const id = parseInt(match[1], 10);
-      return (await this.getProductById(id, organizationId || '', params)) as T;
-    }
-
-    throw new Error(`Unsupported URL: ${url}`);
   }
 
   /**
@@ -486,18 +547,24 @@ export class ProductsService {
     if (match) {
       const id = parseInt(match[1], 10);
       const orgId = parseInt(organizationId || '0', 10);
-      
+
       const updateData: any = {};
       if (data.name !== undefined) updateData.name = data.name;
       if (data.sku !== undefined) updateData.sku = data.sku;
-      if (data.description !== undefined) updateData.description = data.description;
+      if (data.description !== undefined)
+        updateData.description = data.description;
       if (data.status !== undefined) updateData.status = data.status;
-      if (data.productType !== undefined) updateData.productType = data.productType;
+      if (data.productType !== undefined)
+        updateData.productType = data.productType;
       if (data.brand !== undefined) updateData.brand = data.brand;
       if (data.model !== undefined) updateData.model = data.model;
       if (data.metadata !== undefined) updateData.metadata = data.metadata;
 
-      const updated = await this.productRepository.update(id, orgId, updateData);
+      const updated = await this.productRepository.update(
+        id,
+        orgId,
+        updateData,
+      );
       if (!updated) {
         throw new NotFoundException(`Product with ID ${id} not found`);
       }
@@ -515,7 +582,7 @@ export class ProductsService {
     if (match) {
       const id = parseInt(match[1], 10);
       const orgId = parseInt(organizationId || '0', 10);
-      
+
       const deleted = await this.productRepository.delete(id, orgId);
       if (!deleted) {
         throw new NotFoundException(`Product with ID ${id} not found`);
@@ -534,7 +601,7 @@ export class ProductsService {
     limit: number = 10,
   ): Promise<Product[]> {
     const orgId = parseInt(organizationId, 10);
-    
+
     // Obtener productos aleatorios usando SQL RANDOM()
     const dbProducts = await this.databaseService.db
       .select()
@@ -561,7 +628,10 @@ export class ProductsService {
       );
 
     // Agrupar precios por productId
-    const pricesByProductId = new Map<number, typeof productPrices.$inferSelect[]>();
+    const pricesByProductId = new Map<
+      number,
+      (typeof productPrices.$inferSelect)[]
+    >();
     allPrices.forEach((price) => {
       if (!pricesByProductId.has(price.productId)) {
         pricesByProductId.set(price.productId, []);
@@ -638,27 +708,33 @@ export class ProductsService {
       }));
 
       // Mapear media al formato esperado
-      const mappedMedia: ProductMediaType[] = this.mapToProductMediaType(productMedia);
+      const mappedMedia: ProductMediaType[] =
+        this.mapToProductMediaType(productMedia);
 
       // Mapear inventario al formato esperado
-      const mappedInventory: ProductInventory[] = productInventory.map((inv) => {
-        const onHand = Number(inv.onHand);
-        const reserved = Number(inv.reserved);
-        const available = onHand - reserved;
+      const mappedInventory: ProductInventory[] = productInventory.map(
+        (inv) => {
+          const onHand = Number(inv.onHand);
+          const reserved = Number(inv.reserved);
+          const available = onHand - reserved;
 
-        return {
-          id: inv.id,
-          product_id: inv.productId,
-          location_id: inv.locationId,
-          on_hand: inv.onHand,
-          reserved: inv.reserved,
-          updated_at: inv.updatedAt?.toISOString() || new Date().toISOString(),
-          location_code: inv.location.code,
-          location_name: inv.location.name,
-          location_type: inv.location.type,
-          available: available,
-        };
-      });
+          return {
+            id: inv.id,
+            product_id: inv.productId,
+            location_id: inv.locationId,
+            on_hand: inv.onHand,
+            reserved: inv.reserved,
+            updated_at:
+              inv.updatedAt?.toISOString() || new Date().toISOString(),
+            location_code: '',
+            location_name: '',
+            location_type: '',
+            available: available,
+          };
+        },
+
+      );
+      console.log("mappedInventory", mappedInventory)
 
       return {
         ...this.mapToProductType(product, true, mappedMedia),

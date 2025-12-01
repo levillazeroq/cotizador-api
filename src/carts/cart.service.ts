@@ -3,6 +3,8 @@ import {
   NotFoundException,
   BadRequestException,
   Logger,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 import { CartRepository } from './cart.repository';
 import { CartChangelogRepository } from './cart-changelog.repository';
@@ -17,6 +19,7 @@ import { PaymentService } from '../payments/payment.service';
 import { CreateProofPaymentDto } from '../payments/dto/create-proof-payment.dto';
 import { ConversationsService } from '../conversations/conversations.service';
 import { PriceListEvaluationService } from './services/price-list-evaluation.service';
+import { PriceListsService } from '../price-lists/price-lists.service';
 
 @Injectable()
 export class CartService {
@@ -30,13 +33,21 @@ export class CartService {
     private readonly paymentService: PaymentService,
     private readonly conversationsService: ConversationsService,
     private readonly priceListEvaluationService: PriceListEvaluationService,
+    @Inject(forwardRef(() => PriceListsService))
+    private readonly priceListsService: PriceListsService,
   ) {}
 
   async createCart(
     createCartDto: CreateCartDto,
   ): Promise<Cart & { items: CartItemRecord[] }> {
-    const { conversationId, items, fullName, documentType, documentNumber } =
-      createCartDto;
+    const {
+      conversationId,
+      items,
+      fullName,
+      documentType,
+      documentNumber,
+      organizationId,
+    } = createCartDto;
 
     // Create new cart with conversation_id and customer info
     const newCart = await this.cartRepository.create({
@@ -53,8 +64,9 @@ export class CartService {
     if (items && items.length > 0) {
       for (const item of items) {
         // Fetch product data from external API
-        const product = await this.productsService.get(
-          `/products/${item.productId}`,
+        const product = await this.productsService.getProductById(
+          item.productId,
+          organizationId,
         );
 
         if (!product) {
@@ -68,11 +80,14 @@ export class CartService {
           productId: item.productId,
           name: product.name,
           sku: product.sku,
-          size: product.size || null,
-          color: product.color || null,
-          price: product.price.amount,
-          quantity: Math.min(item.quantity, product.stock || item.quantity),
-          imageUrl: product.imageUrl || product.images?.[0] || null,
+          size: product.metadata?.size || null,
+          color: product.metadata?.color || null,
+          price: product.prices[0].amount,
+          quantity: Math.min(
+            item.quantity,
+            product.inventory?.[0]?.available || item.quantity,
+          ),
+          imageUrl: product.media?.[0]?.url || null,
         };
         const createdItem =
           await this.cartRepository.createCartItem(newCartItem);
@@ -109,7 +124,14 @@ export class CartService {
   async getCartById(
     id: string,
     organizationId?: string,
-  ): Promise<Cart & { items: CartItemRecord[]; appliedPriceList?: any; savings?: number; defaultPriceListTotal?: number }> {
+  ): Promise<
+    Cart & {
+      items: CartItemRecord[];
+      appliedPriceList?: any;
+      savings?: number;
+      defaultPriceListTotal?: number;
+    }
+  > {
     const cart = await this.cartRepository.findByIdWithItems(id);
     if (!cart) {
       throw new NotFoundException(`Cart with ID ${id} not found`);
@@ -117,8 +139,19 @@ export class CartService {
 
     // Si hay organizationId, calcular información de lista de precios aplicada
     if (organizationId && cart.items && cart.items.length > 0) {
-      const pricingInfo = await this.calculateCartPricingInfo(cart, organizationId);
-      return { ...cart, ...pricingInfo };
+      const pricingInfo = await this.calculateCartPricingInfo(
+        cart,
+        organizationId,
+      );
+      
+      // Actualizar precios de los items con la lista de precios aplicada
+      const updatedItems = await this.updateCartItemsPrices(
+        cart.items,
+        pricingInfo.appliedPriceList,
+        organizationId,
+      );
+      
+      return { ...cart, items: updatedItems, ...pricingInfo };
     }
 
     return cart;
@@ -127,7 +160,14 @@ export class CartService {
   async getCartByConversationId(
     conversationId: string,
     organizationId?: string,
-  ): Promise<Cart & { items: CartItemRecord[]; appliedPriceList?: any; savings?: number; defaultPriceListTotal?: number }> {
+  ): Promise<
+    Cart & {
+      items: CartItemRecord[];
+      appliedPriceList?: any;
+      savings?: number;
+      defaultPriceListTotal?: number;
+    }
+  > {
     const cart =
       await this.cartRepository.findByConversationIdWithItems(conversationId);
     if (!cart) {
@@ -138,8 +178,19 @@ export class CartService {
 
     // Si hay organizationId, calcular información de lista de precios aplicada
     if (organizationId && cart.items && cart.items.length > 0) {
-      const pricingInfo = await this.calculateCartPricingInfo(cart, organizationId);
-      return { ...cart, ...pricingInfo };
+      const pricingInfo = await this.calculateCartPricingInfo(
+        cart,
+        organizationId,
+      );
+      
+      // Actualizar precios de los items con la lista de precios aplicada
+      const updatedItems = await this.updateCartItemsPrices(
+        cart.items,
+        pricingInfo.appliedPriceList,
+        organizationId,
+      );
+      
+      return { ...cart, items: updatedItems, ...pricingInfo };
     }
 
     return cart;
@@ -151,7 +202,11 @@ export class CartService {
   private async calculateCartPricingInfo(
     cart: Cart & { items: CartItemRecord[] },
     organizationId: string,
-  ): Promise<{ appliedPriceList?: any; savings?: number; defaultPriceListTotal?: number }> {
+  ): Promise<{
+    appliedPriceList?: any;
+    savings?: number;
+    defaultPriceListTotal?: number;
+  }> {
     try {
       // Preparar items para evaluación de precios
       const items = cart.items.map((item) => ({
@@ -172,6 +227,79 @@ export class CartService {
       // En caso de error, retornar sin información adicional
       return {};
     }
+  }
+
+  /**
+   * Actualiza los precios de los items del carrito con la lista de precios aplicada
+   */
+  private async updateCartItemsPrices(
+    items: CartItemRecord[],
+    appliedPriceList: { id: number; name: string; isDefault: boolean } | undefined,
+    organizationId: string,
+  ): Promise<CartItemRecord[]> {
+    // Si no hay lista aplicada o es la lista por defecto, retornar items sin cambios
+    if (!appliedPriceList || appliedPriceList.isDefault) {
+      return items;
+    }
+
+    // Obtener la lista de precios por defecto para usar como fallback
+    const priceLists = await this.priceListsService.getPriceLists(
+      organizationId,
+      { status: 'active' },
+    );
+    const defaultPriceList = priceLists.priceLists.find(
+      (pl) => pl.isDefault,
+    );
+
+    if (!defaultPriceList) {
+      this.logger.warn('Default price list not found, returning items without price update');
+      return items;
+    }
+
+    // Actualizar precios de cada item
+    const updatedItems = await Promise.all(
+      items.map(async (item) => {
+        try {
+          // Obtener el precio del producto en la lista de precios aplicada
+          const { amount } = await this.priceListEvaluationService.getProductPrice(
+            item.productId,
+            appliedPriceList.id,
+            organizationId,
+          );
+          
+          return {
+            ...item,
+            price: amount,
+          };
+        } catch (error) {
+          // Si no hay precio en la lista aplicada, intentar con la lista por defecto
+          try {
+            const { amount } = await this.priceListEvaluationService.getProductPrice(
+              item.productId,
+              defaultPriceList.id,
+              organizationId,
+            );
+            
+            this.logger.warn(
+              `Price not found for product ${item.productId} in applied price list ${appliedPriceList.id}, using default price`,
+            );
+            
+            return {
+              ...item,
+              price: amount,
+            };
+          } catch (fallbackError) {
+            // Si tampoco hay precio por defecto, mantener el precio actual
+            this.logger.error(
+              `Could not get price for product ${item.productId} in any price list`,
+            );
+            return item;
+          }
+        }
+      }),
+    );
+
+    return updatedItems;
   }
 
   async getPriceListProgress(id: string, organizationId: string) {
@@ -239,46 +367,40 @@ export class CartService {
           item.productId,
         );
 
-        if (existingItem) {
-          // Item existe: actualizar cantidad según operación y precio
-          let newQuantity = existingItem.quantity;
+        // Item no existe: crear solo si la operación es 'add'
+        if (itemOperation === 'add') {
+          const cartItem: NewCartItem = {
+            cartId: id,
+            productId: item.productId,
+            name: item.name,
+            sku: item.sku,
+            price: item.price,
+            quantity: item.quantity,
+            description: item.description,
+            imageUrl: item.imageUrl,
+          };
 
-          if (itemOperation === 'add') {
-            newQuantity += item.quantity;
-          } else if (itemOperation === 'remove') {
-            newQuantity -= item.quantity;
-          }
-
-          // Si la cantidad es 0 o negativa, eliminar el item
-          if (newQuantity <= 0) {
-            await this.cartRepository.deleteCartItem(existingItem.id);
-          } else {
-            // Actualizar item con nueva cantidad y precio
-            await this.cartRepository.updateCartItem(existingItem.id, {
-              quantity: newQuantity,
-              price: item.price, // Actualizar también el precio
-              name: item.name, // Actualizar nombre por si cambió
-              sku: item.sku, // Actualizar SKU por si cambió
-            });
-          }
+          await this.cartRepository.addCartItemByProductId({
+            cartId: id,
+            productId: item.productId,
+            quantity: item.quantity,
+            cartItem,
+            organizationId,
+          });
         } else {
-          // Item no existe: crear solo si la operación es 'add'
-          if (itemOperation === 'add') {
-            const cartItem: NewCartItem = {
+          try {
+            await this.cartRepository.removeCartItemByProductId({
               cartId: id,
               productId: item.productId,
-              name: item.name,
-              sku: item.sku,
-              price: item.price,
               quantity: item.quantity,
-              description: item.description,
-              imageUrl: item.imageUrl,
-            };
-
-            await this.cartRepository.createCartItem(cartItem);
-          } else {
-            this.logger.warn(
-              `Cannot remove item ${item.productId} from cart ${id}: item does not exist`,
+            });
+          } catch (error) {
+            this.logger?.error?.(
+              `Failed to remove cart item (cartId: ${id}, productId: ${item.productId}): ${error.message || error}`,
+            );
+            // Optionally rethrow or handle gracefully
+            throw new BadRequestException(
+              `No se pudo eliminar el producto (${item.name || item.productId}) del carrito.`,
             );
           }
         }

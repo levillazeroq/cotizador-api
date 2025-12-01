@@ -87,69 +87,7 @@ export class InventoryController {
   })
   @Get()
   async getInventory(@Query() query: any) {
-    return await this.inventoryService.get('/inventory', query);
-  }
-
-  @ApiOperation({
-    summary: 'Obtener inventario agregado',
-    description: 'Retorna datos de inventario agregados por producto, sumando todas las ubicaciones. Útil para obtener disponibilidad total de cada producto.',
-  })
-  @ApiQuery({
-    name: 'product_id',
-    required: false,
-    type: String,
-    description: 'Filtrar por ID de producto específico',
-    example: 'prod_123456',
-  })
-  @ApiQuery({
-    name: 'category',
-    required: false,
-    type: String,
-    description: 'Filtrar por categoría de productos',
-    example: 'Laptops',
-  })
-  @ApiQuery({
-    name: 'lowStock',
-    required: false,
-    type: Boolean,
-    description: 'Mostrar solo productos con stock bajo',
-    example: true,
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Inventario agregado obtenido exitosamente',
-    schema: {
-      type: 'array',
-      items: {
-        type: 'object',
-        properties: {
-          productId: { type: 'string', example: 'prod_123456' },
-          productName: { type: 'string', example: 'Laptop Dell XPS 13' },
-          sku: { type: 'string', example: 'DELL-XPS13-2024' },
-          totalQuantity: { type: 'number', example: 45 },
-          totalReserved: { type: 'number', example: 8 },
-          totalAvailable: { type: 'number', example: 37 },
-          locations: { type: 'number', example: 3, description: 'Número de ubicaciones con este producto' },
-          status: { type: 'string', example: 'in_stock' },
-          byLocation: {
-            type: 'array',
-            items: {
-              type: 'object',
-              properties: {
-                locationId: { type: 'string' },
-                locationName: { type: 'string' },
-                quantity: { type: 'number' },
-                available: { type: 'number' },
-              },
-            },
-          },
-        },
-      },
-    },
-  })
-  @Get('aggregated')
-  async getAggregatedInventory(@Query() query: any) {
-    return await this.inventoryService.get('/inventory/aggregated', query);
+    return await this.inventoryService.getInventory(query);
   }
 
   @ApiOperation({
@@ -231,6 +169,6 @@ export class InventoryController {
   @Put()
   @HttpCode(HttpStatus.OK)
   async updateInventory(@Body() data: any) {
-    return await this.inventoryService.put('/inventory', data);
+    return await this.inventoryService.updateInventory(data);
   }
 }

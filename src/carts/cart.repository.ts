@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { eq, desc, and, asc } from 'drizzle-orm';
 import { DatabaseService } from '../database/database.service';
 import {
@@ -308,7 +308,7 @@ export class CartRepository {
     // find product item by productId and cartId
     const productItem = await this.findCartItemByProductId(cartId, productId);
     if (!productItem) {
-      return false;
+      throw new NotFoundException(`Product item with productId ${productId} not found in cart ${cartId}`);
     }
 
     // reduce quantity
