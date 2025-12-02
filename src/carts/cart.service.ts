@@ -139,19 +139,21 @@ export class CartService {
 
     // Si hay organizationId, calcular información de lista de precios aplicada
     if (organizationId && cart.items && cart.items.length > 0) {
-      const pricingInfo = await this.calculateCartPricingInfo(
-        cart,
-        organizationId,
-      );
-      
+      const start = performance.now();
+      // const pricingInfo = await this.calculateCartPricingInfo(
+      //   cart,
+      //   organizationId,
+      // );
+      const end = performance.now();
+      console.log(`Time taken: ${end - start} milliseconds`);
       // Actualizar precios de los items con la lista de precios aplicada
-      const updatedItems = await this.updateCartItemsPrices(
-        cart.items,
-        pricingInfo.appliedPriceList,
-        organizationId,
-      );
+      // const updatedItems = await this.updateCartItemsPrices(
+      //   cart.items,
+      //   pricingInfo.appliedPriceList,
+      //   organizationId,
+      // );
       
-      return { ...cart, items: updatedItems, ...pricingInfo };
+      return { ...cart, items: cart.items };
     }
 
     return cart;
@@ -178,19 +180,19 @@ export class CartService {
 
     // Si hay organizationId, calcular información de lista de precios aplicada
     if (organizationId && cart.items && cart.items.length > 0) {
-      const pricingInfo = await this.calculateCartPricingInfo(
-        cart,
-        organizationId,
-      );
-      
+      // const pricingInfo = await this.calculateCartPricingInfo(
+      //   cart,
+      //   organizationId,
+      // );
+
       // Actualizar precios de los items con la lista de precios aplicada
-      const updatedItems = await this.updateCartItemsPrices(
-        cart.items,
-        pricingInfo.appliedPriceList,
-        organizationId,
-      );
+      // const updatedItems = await this.updateCartItemsPrices(
+      //   cart.items,
+      //   pricingInfo.appliedPriceList,
+      //   organizationId,
+      // );
       
-      return { ...cart, items: updatedItems, ...pricingInfo };
+      return { ...cart, items: cart.items };
     }
 
     return cart;
@@ -308,11 +310,15 @@ export class CartService {
       throw new NotFoundException(`Cart with ID ${id} not found`);
     }
 
+    let start = performance.now();
     // Calcular totales del carrito
     const { totalItems, totalPrice } =
       await this.cartRepository.calculateCartTotals(id);
+    let end = performance.now();
+    console.log(`Time taken for calculateCartTotals: ${Math.round((end - start) / 1000)} seconds`);
 
     // Obtener progreso hacia mejores listas de precios
+    start = performance.now();
     const progress =
       await this.priceListEvaluationService.calculatePriceListProgress(
         {
@@ -322,7 +328,8 @@ export class CartService {
         },
         organizationId,
       );
-
+    end = performance.now();
+    console.log(`Time taken for calculatePriceListProgress: ${Math.round((end - start) / 1000)} seconds`);
     return progress;
   }
 

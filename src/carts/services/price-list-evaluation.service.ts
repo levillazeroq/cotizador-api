@@ -6,7 +6,9 @@ import { Cart } from '../../database/schemas';
 export interface PriceListEvaluationContext {
   totalPrice: number;
   totalQuantity: number;
-  cart: Cart & { items?: Array<{ productId: number; quantity: number; price?: string }> };
+  cart: Cart & {
+    items?: Array<{ productId: number; quantity: number; price?: string }>;
+  };
 }
 
 export interface ProductPriceResult {
@@ -173,7 +175,7 @@ export class PriceListEvaluationService {
           break;
         }
       }
-        lowestTotalPrice = currentTotal;
+      lowestTotalPrice = currentTotal;
     }
 
     // Paso 5: Actualizar precios con la mejor lista seleccionada
@@ -201,12 +203,12 @@ export class PriceListEvaluationService {
 
   /**
    * Calcula el progreso hacia las listas de precios disponibles
-   * 
+   *
    * Reglas:
    * 1. La lista por defecto NUNCA se muestra (siempre está aplicada)
    * 2. Solo se muestran listas que el usuario AÚN NO ha alcanzado
    * 3. Motiva al usuario mostrando cuánto le falta para desbloquear mejores precios
-   * 
+   *
    * Tipo Amazon: "Te faltan $50 para desbloquear precios mayoristas"
    */
   async calculatePriceListProgress(
@@ -223,6 +225,83 @@ export class PriceListEvaluationService {
     this.logger.debug(
       `Evaluating ${priceLists.priceLists.length} price lists for progress calculation`,
     );
+
+    // OPTIMIZACIÓN 1: Pre-calcular la lista de precios por defecto UNA SOLA VEZ
+    const defaultPriceList = priceLists.priceLists.find(
+      (pl) => pl.isDefault,
+    );
+
+    if (!defaultPriceList) {
+      this.logger.warn(
+        'Default price list not found for savings calculation',
+      );
+      // Continuar sin calcular ahorros potenciales
+    }
+
+    // OPTIMIZACIÓN 2: Pre-cargar todos los productos con precios UNA SOLA VEZ
+    // Solo si hay items en el carrito y hay lista por defecto
+    let productPricesMap: Map<number, Map<number, number>> | null = null;
+    let defaultTotal = 0;
+    const hasItems = context.cart.items && context.cart.items.length > 0;
+
+    if (hasItems && defaultPriceList) {
+      try {
+        const startTime = performance.now();
+        const itemsWithPrices = await this.productsService.getProducts(
+          organizationId,
+          {
+            ids: context.cart.items!.map((item) => item.productId),
+            include: ['prices'],
+          },
+        );
+
+        // OPTIMIZACIÓN 3: Crear Map anidado para búsquedas O(1)
+        // Estructura: Map<productId, Map<priceListId, amount>>
+        productPricesMap = new Map();
+        
+        for (const product of itemsWithPrices.data) {
+          const pricesMap = new Map<number, number>();
+          for (const price of product.prices || []) {
+            pricesMap.set(price.price_list_id, Number(price.amount));
+          }
+          productPricesMap.set(product.id, pricesMap);
+        }
+
+        // OPTIMIZACIÓN 4: Calcular defaultTotal UNA SOLA VEZ antes del loop
+        for (const item of context.cart.items!) {
+          const productPrices = productPricesMap.get(item.productId);
+          const defaultAmount = productPrices?.get(defaultPriceList.id);
+          
+          if (defaultAmount !== undefined) {
+            defaultTotal += defaultAmount * item.quantity;
+          } else {
+            this.logger.warn(
+              `Could not get default price for product ${item.productId} in price list ${defaultPriceList.id}`,
+            );
+            defaultTotal = Infinity;
+            break;
+          }
+        }
+
+        const endTime = performance.now();
+        this.logger.debug(
+          `Pre-loaded ${itemsWithPrices.data.length} products with prices in ${Math.round(endTime - startTime)}ms`,
+        );
+      } catch (error) {
+        this.logger.warn(
+          `Could not pre-load products for savings calculation: ${error.message}`,
+        );
+        // Continuar sin calcular ahorros potenciales
+      }
+    }
+
+    // OPTIMIZACIÓN 5: Pre-formatear el ahorro para evitar formatear múltiples veces
+    const formatSavings = (savings: number): string => {
+      return savings.toLocaleString('es-CL', {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0,
+      });
+    };
 
     // Evaluar cada lista de precios
     for (const priceList of priceLists.priceLists) {
@@ -250,6 +329,7 @@ export class PriceListEvaluationService {
       const conditionProgresses: ConditionProgress[] = [];
       let allConditionsMet = true;
 
+      // OPTIMIZACIÓN 6: Calcular progreso de condiciones (ya optimizado, no cambia)
       for (const condition of activeConditions) {
         const progress = this.calculateConditionProgress(
           condition,
@@ -266,7 +346,6 @@ export class PriceListEvaluationService {
       }
 
       // REGLA 3: Solo incluir listas que AÚN NO están completamente cumplidas
-      // (para motivar al usuario a seguir agregando productos)
       if (!allConditionsMet) {
         this.logger.debug(
           `Including price list "${priceList.name}" (ID: ${priceList.id}) - not all conditions met`,
@@ -275,74 +354,40 @@ export class PriceListEvaluationService {
         // Calcular ahorro potencial con esta lista de precios
         let potentialSavings = 0;
         let projectedTotal = 0;
-        let defaultTotal = 0;
-        
-        try {
-          // Obtener la lista de precios por defecto
-          const defaultPriceList = priceLists.priceLists.find(
-            (pl) => pl.isDefault,
-          );
 
-          if (!defaultPriceList) {
-            this.logger.warn('Default price list not found for savings calculation');
-          }
-
-          // Si el carrito tiene items, calcular el ahorro potencial
-          if (context.cart.items && context.cart.items.length > 0 && defaultPriceList) {
-            // Calcular el total con la lista de precios por defecto
-            for (const item of context.cart.items) {
-              try {
-                const { amount: defaultAmount } = await this.getProductPrice(
-                  item.productId,
-                  defaultPriceList.id,
-                  organizationId,
-                );
-                defaultTotal += Number(defaultAmount) * item.quantity;
-              } catch (error) {
+        // OPTIMIZACIÓN 7: Usar los precios pre-cargados en lugar de hacer queries individuales
+        if (hasItems && defaultPriceList && productPricesMap && defaultTotal !== Infinity) {
+          try {
+            // OPTIMIZACIÓN 8: Calcular projectedTotal en un solo loop usando Map
+            for (const item of context.cart.items!) {
+              const productPrices = productPricesMap.get(item.productId);
+              const amount = productPrices?.get(priceList.id);
+              
+              if (amount !== undefined) {
+                projectedTotal += amount * item.quantity;
+              } else {
                 this.logger.warn(
-                  `Could not get default price for product ${item.productId}: ${error.message}`,
+                  `Could not get price for product ${item.productId} in price list ${priceList.id}`,
                 );
-              }
-            }
-
-            // Calcular el total que tendría el carrito con esta lista de precios
-            for (const item of context.cart.items) {
-              try {
-              const { amount } = await this.getProductPrice(
-                item.productId,
-                priceList.id,
-                organizationId,
-              );
-              projectedTotal += Number(amount) * item.quantity;
-              } catch (error) {
-                this.logger.warn(
-                  `Could not get price for product ${item.productId} in price list ${priceList.id}: ${error.message}`,
-                );
-                // Si no hay precio en esta lista, no hay ahorro
                 projectedTotal = Infinity;
                 break;
               }
             }
 
             // El ahorro es la diferencia entre el total por defecto y el total con esta lista
-            // (positivo = ahorro, negativo = más caro)
             if (projectedTotal !== Infinity && defaultTotal > 0) {
               potentialSavings = defaultTotal - projectedTotal;
-            
-            this.logger.debug(
-                `Price list "${priceList.name}": Default total: ${defaultTotal}, Projected total: ${projectedTotal}, Savings: ${potentialSavings}`,
-            );
 
-              // Actualizar mensajes de condiciones con el ahorro potencial si está disponible
+              this.logger.debug(
+                `Price list "${priceList.name}": Default total: ${defaultTotal}, Projected total: ${projectedTotal}, Savings: ${potentialSavings}`,
+              );
+
+              // OPTIMIZACIÓN 9: Actualizar mensajes solo si hay ahorro positivo
               if (potentialSavings > 0) {
+                const savingsFormatted = formatSavings(potentialSavings);
+                
                 for (const conditionProgress of conditionProgresses) {
                   if (!conditionProgress.isMet) {
-                    // Formatear el ahorro para el mensaje
-                    const savingsFormatted = potentialSavings.toLocaleString('es-CL', {
-                      minimumFractionDigits: 0,
-                      maximumFractionDigits: 0,
-                    });
-
                     // Actualizar el mensaje según el tipo de condición
                     if (conditionProgress.conditionType === 'amount') {
                       conditionProgress.message = `Agrega $${conditionProgress.remaining.toFixed(0)} para obtener un descuento de $${savingsFormatted}`;
@@ -353,12 +398,12 @@ export class PriceListEvaluationService {
                 }
               }
             }
+          } catch (error) {
+            this.logger.warn(
+              `Could not calculate potential savings for price list "${priceList.name}": ${error.message}`,
+            );
+            // Si no se puede calcular, continuar sin el ahorro
           }
-        } catch (error) {
-          this.logger.warn(
-            `Could not calculate potential savings for price list "${priceList.name}": ${error.message}`,
-          );
-          // Si no se puede calcular, continuar sin el ahorro
         }
 
         progressList.push({
@@ -367,7 +412,7 @@ export class PriceListEvaluationService {
           conditions: conditionProgresses,
           potentialSavings: potentialSavings > 0 ? potentialSavings : undefined,
           currentTotal: context.totalPrice,
-          projectedTotal: projectedTotal > 0 ? projectedTotal : undefined,
+          projectedTotal: projectedTotal > 0 && projectedTotal !== Infinity ? projectedTotal : undefined,
         });
       } else {
         this.logger.debug(
@@ -455,7 +500,9 @@ export class PriceListEvaluationService {
           currentValue = 1;
           targetValue = 1;
         } else if (fromDate && now < fromDate) {
-          const daysRemaining = Math.ceil((fromDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+          const daysRemaining = Math.ceil(
+            (fromDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24),
+          );
           remaining = daysRemaining;
           message = `Esta lista de precios estará disponible en ${daysRemaining} día${daysRemaining > 1 ? 's' : ''}`;
           progress = 0;
@@ -636,7 +683,11 @@ export class PriceListEvaluationService {
 
     // Evaluar cada lista de precios (excepto la por defecto)
     for (const priceList of priceLists.priceLists) {
-      if (priceList.isDefault || !priceList.conditions || priceList.conditions.length === 0) {
+      if (
+        priceList.isDefault ||
+        !priceList.conditions ||
+        priceList.conditions.length === 0
+      ) {
         continue;
       }
 
@@ -761,32 +812,6 @@ export class PriceListEvaluationService {
   }
 
   /**
-   * Obtiene el precio de un producto con su lista de precios aplicable
-   */
-  async getProductPriceWithApplicableList(
-    productId: number,
-    context: PriceListEvaluationContext,
-    organizationId: string,
-  ): Promise<{ amount: string; priceListId: number; priceListName: string }> {
-    const applicablePriceList = await this.findApplicablePriceList(
-      context,
-      organizationId,
-    );
-
-    const { amount } = await this.getProductPrice(
-      productId,
-      applicablePriceList.id,
-      organizationId,
-    );
-
-    return {
-      amount,
-      priceListId: applicablePriceList.id,
-      priceListName: applicablePriceList.name,
-    };
-  }
-
-  /**
    * Calcula la información de lista de precios aplicada y ahorro para un carrito existente
    * Sin modificar los items del carrito
    */
@@ -891,9 +916,7 @@ export class PriceListEvaluationService {
 
       return {};
     } catch (error) {
-      this.logger.warn(
-        `Error calculating savings info: ${error.message}`,
-      );
+      this.logger.warn(`Error calculating savings info: ${error.message}`);
       return {};
     }
   }
@@ -939,9 +962,7 @@ export class PriceListEvaluationService {
         return this.evaluateCustomerTypeCondition(condition, cart);
 
       default:
-        this.logger.warn(
-          `Unknown condition type: ${condition.conditionType}`,
-        );
+        this.logger.warn(`Unknown condition type: ${condition.conditionType}`);
         return false;
     }
   }
@@ -949,10 +970,7 @@ export class PriceListEvaluationService {
   /**
    * Evalúa condición de monto
    */
-  private evaluateAmountCondition(
-    condition: any,
-    totalPrice: number,
-  ): boolean {
+  private evaluateAmountCondition(condition: any, totalPrice: number): boolean {
     const minAmount = condition.conditionValue?.min_amount || 0;
     const maxAmount = condition.conditionValue?.max_amount;
 
@@ -973,9 +991,7 @@ export class PriceListEvaluationService {
         return totalPrice === minAmount;
 
       case 'between':
-        return (
-          totalPrice >= minAmount && totalPrice <= (maxAmount || Infinity)
-        );
+        return totalPrice >= minAmount && totalPrice <= (maxAmount || Infinity);
 
       default:
         this.logger.warn(
@@ -1086,4 +1102,3 @@ export class PriceListEvaluationService {
     return false;
   }
 }
-
