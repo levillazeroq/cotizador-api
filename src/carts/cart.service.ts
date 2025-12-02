@@ -152,7 +152,7 @@ export class CartService {
       //   pricingInfo.appliedPriceList,
       //   organizationId,
       // );
-      
+
       return { ...cart, items: cart.items };
     }
 
@@ -191,7 +191,7 @@ export class CartService {
       //   pricingInfo.appliedPriceList,
       //   organizationId,
       // );
-      
+
       return { ...cart, items: cart.items };
     }
 
@@ -236,7 +236,9 @@ export class CartService {
    */
   private async updateCartItemsPrices(
     items: CartItemRecord[],
-    appliedPriceList: { id: number; name: string; isDefault: boolean } | undefined,
+    appliedPriceList:
+      | { id: number; name: string; isDefault: boolean }
+      | undefined,
     organizationId: string,
   ): Promise<CartItemRecord[]> {
     // Si no hay lista aplicada o es la lista por defecto, retornar items sin cambios
@@ -249,12 +251,12 @@ export class CartService {
       organizationId,
       { status: 'active' },
     );
-    const defaultPriceList = priceLists.priceLists.find(
-      (pl) => pl.isDefault,
-    );
+    const defaultPriceList = priceLists.priceLists.find((pl) => pl.isDefault);
 
     if (!defaultPriceList) {
-      this.logger.warn('Default price list not found, returning items without price update');
+      this.logger.warn(
+        'Default price list not found, returning items without price update',
+      );
       return items;
     }
 
@@ -263,12 +265,13 @@ export class CartService {
       items.map(async (item) => {
         try {
           // Obtener el precio del producto en la lista de precios aplicada
-          const { amount } = await this.priceListEvaluationService.getProductPrice(
-            item.productId,
-            appliedPriceList.id,
-            organizationId,
-          );
-          
+          const { amount } =
+            await this.priceListEvaluationService.getProductPrice(
+              item.productId,
+              appliedPriceList.id,
+              organizationId,
+            );
+
           return {
             ...item,
             price: amount,
@@ -276,16 +279,17 @@ export class CartService {
         } catch (error) {
           // Si no hay precio en la lista aplicada, intentar con la lista por defecto
           try {
-            const { amount } = await this.priceListEvaluationService.getProductPrice(
-              item.productId,
-              defaultPriceList.id,
-              organizationId,
-            );
-            
+            const { amount } =
+              await this.priceListEvaluationService.getProductPrice(
+                item.productId,
+                defaultPriceList.id,
+                organizationId,
+              );
+
             this.logger.warn(
               `Price not found for product ${item.productId} in applied price list ${appliedPriceList.id}, using default price`,
             );
-            
+
             return {
               ...item,
               price: amount,
@@ -315,7 +319,9 @@ export class CartService {
     const { totalItems, totalPrice } =
       await this.cartRepository.calculateCartTotals(id);
     let end = performance.now();
-    console.log(`Time taken for calculateCartTotals: ${Math.round((end - start) / 1000)} seconds`);
+    console.log(
+      `Time taken for calculateCartTotals: ${Math.round((end - start) / 1000)} seconds`,
+    );
 
     // Obtener progreso hacia mejores listas de precios
     start = performance.now();
@@ -329,7 +335,9 @@ export class CartService {
         organizationId,
       );
     end = performance.now();
-    console.log(`Time taken for calculatePriceListProgress: ${Math.round((end - start) / 1000)} seconds`);
+    console.log(
+      `Time taken for calculatePriceListProgress: ${Math.round((end - start) / 1000)} seconds`,
+    );
     return progress;
   }
 
@@ -468,35 +476,48 @@ export class CartService {
     if (updateCartDto.suggestions && updateCartDto.suggestions.length > 0) {
       for (const item of updateCartDto.suggestions) {
         // Fetch product data for changelog
-        const product = await this.productsService.getProductById(
-          item.productId,
-          organizationId,
-        );
-
-        if (!product) {
-          throw new NotFoundException(
-            `Product with ID ${item.productId} not found`,
+        try {
+          const product = await this.productsService.getProductById(
+            item.productId,
+            organizationId,
           );
+
+          if (!product) {
+            throw new NotFoundException(
+              `Product with ID ${item.productId} not found`,
+            );
+          }
+
+          if (!product.prices || product.prices.length === 0) {
+            throw new NotFoundException(
+              `Price not found for product ${item.productId}`,
+            );
+          }
+
+          const newCartItem: NewCartItem = {
+            cartId: id,
+            productId: item.productId,
+            name: product.name,
+            sku: product.sku,
+            // size: product.?.[0]?.name || null,
+            // color: product.color || null,
+            description: product.description || null,
+            price: product.prices[0].amount,
+            // TODO: make this well
+            quantity: Math.min(
+              item.quantity,
+              product.inventory?.[0]?.available || item.quantity,
+            ),
+            imageUrl: product.media?.[0]?.url || null,
+          };
+
+          suggestions.push(newCartItem);
+        } catch (error) {
+          this.logger?.error?.(
+            `Failed to get product ${item.productId}: ${error.message || error}`,
+          );
+          continue;
         }
-
-        const newCartItem: NewCartItem = {
-          cartId: id,
-          productId: item.productId,
-          name: product.name,
-          sku: product.sku,
-          // size: product.?.[0]?.name || null,
-          // color: product.color || null,
-          description: product.description || null,
-          price: product.prices[0].amount,
-          // TODO: make this well
-          quantity: Math.min(
-            item.quantity,
-            product.inventory?.[0]?.available || item.quantity,
-          ),
-          imageUrl: product.media?.[0]?.url || null,
-        };
-
-        suggestions.push(newCartItem);
       }
     }
 
