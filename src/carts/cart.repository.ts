@@ -181,6 +181,25 @@ export class CartRepository {
     return result.length > 0;
   }
 
+  async deleteByConversationId(conversationId: string): Promise<Cart | null> {
+    // First find the cart to return it
+    const cart = await this.findByConversationId(conversationId);
+    if (!cart) {
+      return null;
+    }
+
+    // Delete cart items first
+    await this.deleteCartItemsByCartId(cart.id);
+
+    // Then delete the cart
+    const result = await this.databaseService.db
+      .delete(carts)
+      .where(eq(carts.conversationId, conversationId))
+      .returning();
+
+    return result[0] || null;
+  }
+
   async clearFirst(): Promise<Cart | null> {
     // First, delete all cart items
     await this.databaseService.db

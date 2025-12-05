@@ -614,4 +614,22 @@ export class CartService {
 
     return payment;
   }
+
+  /**
+   * Elimina un carrito por conversation ID
+   */
+  async deleteCartByConversationId(conversationId: string): Promise<{ id: string; conversationId: string }> {
+    const deletedCart = await this.cartRepository.deleteByConversationId(conversationId);
+    
+    if (!deletedCart) {
+      throw new NotFoundException(`Cart with conversation ID ${conversationId} not found`);
+    }
+
+    this.logger.log(`Cart ${deletedCart.id} deleted for conversation ${conversationId}`);
+
+    return {
+      id: deletedCart.id,
+      conversationId: deletedCart.conversationId,
+    };
+  }
 }

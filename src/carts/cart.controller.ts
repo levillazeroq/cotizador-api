@@ -4,6 +4,7 @@ import {
   Post,
   Put,
   Patch,
+  Delete,
   Body,
   Param,
   HttpCode,
@@ -176,6 +177,41 @@ export class CartController {
   ) {
     const cart = await this.cartService.getCartByConversationId(conversationId, organizationId);
     return cart;
+  }
+
+  @ApiOperation({
+    summary: 'Eliminar carrito por conversation ID',
+    description:
+      'Elimina un carrito específico y todos sus items asociados a un conversation_id.',
+  })
+  @ApiParam({
+    name: 'conversationId',
+    description: 'ID de la conversación',
+    type: String,
+    example: 'conv_abc123xyz',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Carrito eliminado exitosamente',
+    schema: {
+      properties: {
+        id: { type: 'string', example: 'cart_123456' },
+        conversationId: { type: 'string', example: 'conv_abc123xyz' },
+        message: { type: 'string', example: 'Carrito eliminado exitosamente' },
+      },
+    },
+  })
+  @ApiResponse({ status: 404, type: ErrorResponseDto })
+  @Delete('conversation/:conversationId')
+  @HttpCode(HttpStatus.OK)
+  async deleteCartByConversationId(
+    @Param('conversationId') conversationId: string,
+  ) {
+    const result = await this.cartService.deleteCartByConversationId(conversationId);
+    return {
+      ...result,
+      message: 'Carrito eliminado exitosamente',
+    };
   }
 
   @ApiOperation({
